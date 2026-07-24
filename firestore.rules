@@ -1,10 +1,9 @@
 rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Só permite acesso a quem estiver autenticado (mesmo autenticação anônima,
-    // que o app já faz sozinho). Isso impede que qualquer robô na internet
-    // leia/escreva direto na API do Firestore sem passar pelo site.
-    match /{document=**} {
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Mesmo princípio do firestore.rules: só quem passou pelo app (autenticação
+    // anônima) pode enviar/ler fotos.
+    match /{allPaths=**} {
       allow read, write: if request.auth != null;
     }
   }

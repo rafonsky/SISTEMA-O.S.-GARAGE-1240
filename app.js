@@ -4,12 +4,16 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gsta
 import {
   getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+let storage = null;
+try{ storage = getStorage(app); }catch(e){ storage = null; }
 
 const STATUS_META = {
+  "Aguardando aprovação":             { color:"#A78BFA", bg:"#2b2140", pulse:true },
   "Em andamento":                    { color:"#E8A33D", bg:"#3a2c10", pulse:true },
   "Aguardando peça":                 { color:"#E8A33D", bg:"#3a2c10", pulse:false },
   "Concluído":                       { color:"#3FBFA8", bg:"#123b34", pulse:false },
@@ -18,6 +22,15 @@ const STATUS_META = {
 };
 const STATUS_LIST = Object.keys(STATUS_META);
 const TIPO_LIST = ["Notebook", "Desktop", "Periférico", "Outro"];
+const CHECKLIST_ITENS = [
+  "Tela/carcaça riscada ou amassada",
+  "Sem carregador/fonte",
+  "Sem cabo(s)",
+  "Bateria não incluída",
+  "Tecla(s) faltando ou danificada(s)",
+  "Sinal de líquido derramado",
+  "Não liga",
+];
 
 let CONFIG = { adminPassword: 'garage1240', siteUrl: '' };
 let CLIENTES = [];     // Firestore: collection "clientes"
@@ -113,7 +126,12 @@ function freshSeed(){
     id: 'OS-' + String(i+1).padStart(4,'0'),
     clienteId: clientId,
     equipamentoId: EQUIPAMENTOS[i].id,
-    defeito: 'Formatação + Clone de imagem (Macrium)',
+    defeitoRelatado: 'Solicitação de formatação e clone de imagem',
+    diagnosticoTecnico: 'Formatação + Clone de imagem (Macrium)',
+    valorOrcamento: '',
+    checklistEntrada: [],
+    checklistObs: '',
+    fotoEntradaUrl: '',
     status: status,
     dataEntrada: '',
     dataConclusao: data,
@@ -127,7 +145,12 @@ function freshSeed(){
     id: 'OS-' + String(ORDENS.length+1).padStart(4,'0'),
     clienteId: clientId,
     equipamentoId: equipExtra.id,
-    defeito: 'Em verificação — defeito ainda não diagnosticado',
+    defeitoRelatado: 'Em verificação — defeito ainda não diagnosticado',
+    diagnosticoTecnico: '',
+    valorOrcamento: '',
+    checklistEntrada: [],
+    checklistObs: '',
+    fotoEntradaUrl: '',
     status: 'Sem conserto – peças aproveitadas',
     dataEntrada: '', dataConclusao: '', pecas: '',
     obs: 'Conserto não compensa financeiramente.',
@@ -187,6 +210,15 @@ async function loadData(){
     }
   }
 
+  // --- migrate "defeito" (old single field) into "defeitoRelatado" (new schema) ---
+  for(const o of ORDENS){
+    if(o.defeitoRelatado === undefined && o.defeito !== undefined){
+      o.defeitoRelatado = o.defeito;
+      await setDoc(doc(db,'ordens', o.id), o);
+      needsSave = true;
+    }
+  }
+
   if(needsSave){
     await setDoc(doc(db, 'config', 'auth'), CONFIG); // strip old "clients" array field
   }
@@ -207,6 +239,13 @@ async function saveEquip(e){ try{ await setDoc(doc(db,'equipamentos', e.id), e);
 async function deleteEquip(id){ try{ await deleteDoc(doc(db,'equipamentos', id)); }catch(e){ showToast('Erro ao excluir: '+e.message); } }
 async function saveOrdem(o){ try{ await setDoc(doc(db,'ordens', o.id), o); }catch(e){ showToast('Erro ao salvar O.S.: '+e.message); } }
 async function deleteOrdem(id){ try{ await deleteDoc(doc(db,'ordens', id)); }catch(e){ showToast('Erro ao excluir: '+e.message); } }
+async function uploadFotoEntrada(file, osId){
+  if(!storage) throw new Error('Storage não disponível');
+  const path = `fotos/${osId}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+  const r = storageRef(storage, path);
+  await uploadBytes(r, file);
+  return await getDownloadURL(r);
+}
 
 /* ---------------- RENDER ROOT ---------------- */
 function render(){
@@ -365,15 +404,23 @@ function openOsDetailModal(id){
       Entrada <span>${fmtDate(o.dataEntrada)}</span>${o.dataConclusao ? ` · Conclusão <span>${fmtDate(o.dataConclusao)}</span>`:''}
     </div>
     ${statusPill(o.status)}
-    ${o.defeito ? `<div class="os-defeito" style="margin-top:14px;">${escapeHTML(o.defeito)}</div>` : ''}
+    ${o.valorOrcamento ? `<div class="os-meta" style="margin-top:10px;">Orçamento <span>${escapeHTML(o.valorOrcamento)}</span></div>` : ''}
+    ${o.defeitoRelatado ? `<div class="os-defeito" style="margin-top:14px;"><strong>Defeito relatado:</strong> ${escapeHTML(o.defeitoRelatado)}</div>` : ''}
+    ${o.diagnosticoTecnico ? `<div class="os-defeito" style="margin-top:8px;"><strong>Diagnóstico técnico:</strong> ${escapeHTML(o.diagnosticoTecnico)}</div>` : ''}
+    ${(o.checklistEntrada&&o.checklistEntrada.length) || o.checklistObs ? `<div class="os-defeito" style="margin-top:8px;"><strong>Estado na entrada:</strong> ${escapeHTML([...(o.checklistEntrada||[]), o.checklistObs].filter(Boolean).join(' · '))}</div>` : ''}
+    ${o.fotoEntradaUrl ? `<div style="margin-top:10px;"><img src="${o.fotoEntradaUrl}" style="max-width:100%; max-height:180px; border-radius:8px; border:1px solid var(--line);"></div>` : ''}
     ${hist.length ? `<div class="timeline" style="margin-top:14px;">
       ${hist.map(h => `<div class="timeline-item"><div class="timeline-dot"></div>
         <div class="timeline-date">${fmtDate(h.data)}</div>
         <div class="timeline-text"><strong>${escapeHTML(h.status)}</strong>${h.texto?' — '+escapeHTML(h.texto):''}</div></div>`).join('')}
     </div>` : ''}
     ${o.obs ? `<div class="os-defeito" style="margin-top:14px; margin-bottom:0;">${escapeHTML(o.obs)}</div>` : ''}
-    <div class="modal-actions"><button class="btn-secondary" id="d-close">Fechar</button></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="d-pdf">Baixar O.S. em PDF</button>
+      <button class="btn-secondary" id="d-close">Fechar</button>
+    </div>
   `);
+  document.getElementById('d-pdf').onclick = () => exportSingleOsPDF(o);
   document.getElementById('d-close').onclick = closeModal;
 }
 
@@ -490,6 +537,7 @@ function renderOsTable(){
           <td data-label="">
             <button class="row-btn" data-edit="${o.id}">Editar</button>
             <button class="row-btn" data-hist="${o.id}">+ Status</button>
+            <button class="row-btn" data-print="${o.id}">Imprimir</button>
             <button class="row-btn row-btn-danger" data-del="${o.id}">Excluir</button>
           </td>
         </tr>
@@ -498,6 +546,7 @@ function renderOsTable(){
   `;
   wrap.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openOsModal(b.dataset.edit));
   wrap.querySelectorAll('[data-hist]').forEach(b => b.onclick = () => openHistModal(b.dataset.hist));
+  wrap.querySelectorAll('[data-print]').forEach(b => b.onclick = () => exportSingleOsPDF(ORDENS.find(x=>x.id===b.dataset.print)));
   wrap.querySelectorAll('[data-del]').forEach(b => b.onclick = () => confirmDelete(
     `Excluir a O.S. ${b.dataset.del}?`, 'Essa ação não pode ser desfeita.',
     async () => {
@@ -512,12 +561,15 @@ function openOsModal(id){
   const editing = !!id;
   const o = editing ? ORDENS.find(x=>x.id===id) : {
     id: nextOsId(), clienteId: CLIENTES[0]?.id || '', equipamentoId:'',
-    defeito:'', status:'Em andamento', dataEntrada: todayStr(), dataConclusao:'', pecas:'', obs:'', historico:[]
+    defeitoRelatado:'', diagnosticoTecnico:'', valorOrcamento:'',
+    checklistEntrada:[], checklistObs:'', fotoEntradaUrl:'',
+    status:'Aguardando aprovação', dataEntrada: todayStr(), dataConclusao:'', pecas:'', obs:'', historico:[]
   };
   renderOsModalBody(o, editing);
 }
 function renderOsModalBody(o, editing){
   const equipDoCliente = EQUIPAMENTOS.filter(e => e.clienteId === o.clienteId);
+  const checklist = o.checklistEntrada || [];
   openModal(`
     <h3>${editing ? 'Editar ' + o.id : 'Nova Ordem de Serviço'}</h3>
     <div class="field"><label>Cliente</label>
@@ -530,7 +582,22 @@ function renderOsModalBody(o, editing){
       </select>
       <div style="margin-top:6px;"><button type="button" class="row-btn" id="m-new-equip">+ Cadastrar novo equipamento</button></div>
     </div>
-    <div class="field"><label>Serviço / defeito relatado</label><textarea id="m-defeito">${escapeHTML(o.defeito)}</textarea></div>
+    <div class="field"><label>Checklist de estado na entrada</label>
+      <div class="checklist-box">
+        ${CHECKLIST_ITENS.map((item,i) => `
+          <label class="checklist-item"><input type="checkbox" id="m-check-${i}" ${checklist.includes(item)?'checked':''}> ${escapeHTML(item)}</label>
+        `).join('')}
+      </div>
+      <input type="text" id="m-check-obs" value="${escapeHTML(o.checklistObs)}" placeholder="Outras observações sobre o estado do equipamento" style="margin-top:8px;">
+    </div>
+    <div class="field"><label>Foto do equipamento (entrada)</label>
+      ${o.fotoEntradaUrl ? `<div style="margin-bottom:8px;"><img src="${o.fotoEntradaUrl}" style="max-width:100%; max-height:160px; border-radius:8px; border:1px solid var(--line);"></div>` : ''}
+      <input type="file" id="m-foto" accept="image/*">
+      <div class="hint" style="margin-top:4px;">${storage ? 'Opcional — ajuda a comprovar o estado do equipamento na entrada.' : 'Upload de foto indisponível (Firebase Storage não configurado).'}</div>
+    </div>
+    <div class="field"><label>Defeito relatado pelo cliente</label><textarea id="m-defeito" placeholder="O que o cliente disse que está acontecendo">${escapeHTML(o.defeitoRelatado)}</textarea></div>
+    <div class="field"><label>Diagnóstico técnico</label><textarea id="m-diagnostico" placeholder="O que foi encontrado/feito após análise">${escapeHTML(o.diagnosticoTecnico)}</textarea></div>
+    <div class="field"><label>Valor do orçamento</label><input type="text" id="m-valor" value="${escapeHTML(o.valorOrcamento)}" placeholder="Ex: R$ 150,00"></div>
     <div class="field"><label>Status atual</label>
       <select id="m-status">${STATUS_LIST.map(s=>`<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></div>
     <div class="field"><label>Data de entrada</label><input type="date" id="m-entrada" value="${o.dataEntrada||''}"></div>
@@ -549,10 +616,15 @@ function renderOsModalBody(o, editing){
   };
   document.getElementById('m-cancel').onclick = closeModal;
   document.getElementById('m-save').onclick = async () => {
+    const saveBtn = document.getElementById('m-save');
     const data = {
       clienteId: document.getElementById('m-cliente').value,
       equipamentoId: document.getElementById('m-equip').value,
-      defeito: document.getElementById('m-defeito').value.trim(),
+      defeitoRelatado: document.getElementById('m-defeito').value.trim(),
+      diagnosticoTecnico: document.getElementById('m-diagnostico').value.trim(),
+      valorOrcamento: document.getElementById('m-valor').value.trim(),
+      checklistEntrada: CHECKLIST_ITENS.filter((_,i) => document.getElementById(`m-check-${i}`).checked),
+      checklistObs: document.getElementById('m-check-obs').value.trim(),
       status: document.getElementById('m-status').value,
       dataEntrada: document.getElementById('m-entrada').value,
       dataConclusao: document.getElementById('m-conclusao').value,
@@ -560,9 +632,16 @@ function renderOsModalBody(o, editing){
       obs: document.getElementById('m-obs').value.trim(),
     };
     if(!data.equipamentoId){ showToast('Selecione (ou cadastre) o equipamento.'); return; }
+    const fotoInput = document.getElementById('m-foto');
+    const file = fotoInput.files[0];
+    saveBtn.disabled = true; saveBtn.textContent = 'Salvando...';
     let target;
     if(editing){ Object.assign(o, data); target = o; }
-    else { target = { id:o.id, historico:[{data:data.dataEntrada||todayStr(), status:data.status, texto:'O.S. aberta.'}], ...data }; ORDENS.push(target); }
+    else { target = { id:o.id, fotoEntradaUrl:'', historico:[{data:data.dataEntrada||todayStr(), status:data.status, texto:'O.S. aberta.'}], ...data }; ORDENS.push(target); }
+    if(file){
+      try{ target.fotoEntradaUrl = await uploadFotoEntrada(file, target.id); }
+      catch(e){ showToast('Não foi possível enviar a foto: '+e.message); }
+    }
     await saveOrdem(target);
     closeModal(); render();
     showToast(editing ? 'O.S. atualizada.' : 'O.S. criada.');
@@ -754,6 +833,7 @@ function renderClientTableAdmin(){
           <td data-label="">
             <button class="row-btn" data-edit="${c.id}">Editar</button>
             ${c.telefone ? `<button class="row-btn" data-wa="${c.id}">WhatsApp</button>` : ''}
+            <button class="row-btn row-btn-danger" data-anon="${c.id}">Anonimizar (LGPD)</button>
             <button class="row-btn row-btn-danger" data-del="${c.id}">Excluir</button>
           </td>
         </tr>
@@ -768,6 +848,16 @@ function renderClientTableAdmin(){
     const url = whatsAppLink(c.telefone, msg);
     if(!url){ showToast('Telefone inválido.'); return; }
     window.open(url, '_blank');
+  });
+  wrap.querySelectorAll('[data-anon]').forEach(b => b.onclick = () => {
+    const c = clienteById(b.dataset.anon);
+    confirmDelete('Anonimizar dados deste cliente?',
+      'Remove nome, telefone, e-mail, CPF/CNPJ, endereço e PIN atual (o acesso ao portal deixa de funcionar). Os equipamentos e O.S. permanecem no histórico, sem dados pessoais — atende ao direito de exclusão da LGPD mantendo o registro do serviço prestado.',
+      async () => {
+        Object.assign(c, { nome:'Cliente anonimizado (LGPD)', telefone:'', email:'', documento:'', endereco:'', pin: uid('anon') });
+        await saveCliente(c);
+        render(); showToast('Dados do cliente anonimizados.');
+      });
   });
   wrap.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
     const id = b.dataset.del;
@@ -865,10 +955,11 @@ function closeModal(){ const el = document.getElementById('modal-overlay'); if(e
 /* ---------------- EXPORT ---------------- */
 function exportCSV(list){
   if(!list || list.length === 0){ showToast('Nada para exportar com esse filtro.'); return; }
-  const headers = ['O.S.','Cliente','Equipamento','Patrimônio','Status','Defeito/Serviço','Entrada','Conclusão','Peças aproveitadas','Observação'];
+  const headers = ['O.S.','Cliente','Equipamento','Patrimônio','Status','Defeito relatado','Diagnóstico técnico','Valor orçamento','Entrada','Conclusão','Peças aproveitadas','Observação'];
   const rows = list.map(o => [
     o.id, clienteNome(o.clienteId), equipNome(o.equipamentoId), equipPatrimonio(o.equipamentoId),
-    o.status, o.defeito||'', fmtDate(o.dataEntrada), fmtDate(o.dataConclusao), o.pecas||'', o.obs||''
+    o.status, o.defeitoRelatado||'', o.diagnosticoTecnico||'', o.valorOrcamento||'',
+    fmtDate(o.dataEntrada), fmtDate(o.dataConclusao), o.pecas||'', o.obs||''
   ]);
   const escCsv = (v) => `"${String(v??'').replace(/"/g,'""')}"`;
   const csv = [headers, ...rows].map(r => r.map(escCsv).join(';')).join('\r\n');
@@ -901,6 +992,94 @@ async function exportPDF(list){
   });
   pdf.save(`ordens-de-servico-${todayStr()}.pdf`);
   showToast('PDF exportado.');
+}
+
+function exportSingleOsPDF(o){
+  if(!o){ showToast('O.S. não encontrada.'); return; }
+  if(!window.jspdf){ showToast('Biblioteca de PDF ainda carregando, tente novamente em instantes.'); return; }
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation:'portrait' });
+  const c = clienteById(o.clienteId);
+  const e = equipById(o.equipamentoId);
+  let y = 18;
+  const left = 14, right = 196;
+  const line = (h=7) => { y += h; if(y > 275){ pdf.addPage(); y = 18; } };
+  const label = (txt) => { pdf.setFont(undefined,'bold'); pdf.setFontSize(9); pdf.text(txt, left, y); pdf.setFont(undefined,'normal'); };
+  const value = (txt, indent=0) => {
+    pdf.setFontSize(10);
+    const lines = pdf.splitTextToSize(String(txt||'—'), right-left-indent);
+    pdf.text(lines, left+indent, y+5);
+    line(5 + lines.length*5);
+  };
+
+  pdf.setFontSize(16); pdf.setFont(undefined,'bold');
+  pdf.text('ORDEM DE SERVIÇO', left, y);
+  pdf.setFontSize(11); pdf.setFont(undefined,'normal');
+  pdf.text(o.id, right, y, { align:'right' });
+  line(6);
+  pdf.setFontSize(9); pdf.setTextColor(110);
+  pdf.text('Rafael / Eduardo — (41) 9131-2064 — garage1240.oficial@gmail.com', left, y);
+  pdf.setTextColor(0);
+  line(10);
+  pdf.setDrawColor(200); pdf.line(left, y, right, y); line(8);
+
+  label('CLIENTE'); value(c ? c.nome : '—');
+  if(c && c.telefone) { value('Telefone: ' + c.telefone); }
+  if(c && c.documento) { value('CPF/CNPJ: ' + c.documento); }
+  line(2);
+
+  label('EQUIPAMENTO'); value(`${e?e.nome:equipNome(o.equipamentoId)}${e&&e.patrimonio?' — Patrimônio: '+e.patrimonio:''}`);
+  if(e && (e.marca || e.modelo)) value('Marca/Modelo: ' + [e.marca,e.modelo].filter(Boolean).join(' / '));
+  line(2);
+
+  label('STATUS ATUAL'); value(o.status);
+  if(o.valorOrcamento) value('Valor do orçamento: ' + o.valorOrcamento);
+  line(2);
+
+  label('DEFEITO RELATADO PELO CLIENTE'); value(o.defeitoRelatado);
+  line(2);
+  label('DIAGNÓSTICO TÉCNICO'); value(o.diagnosticoTecnico);
+  line(2);
+
+  if((o.checklistEntrada && o.checklistEntrada.length) || o.checklistObs){
+    label('ESTADO NA ENTRADA (CHECKLIST)');
+    value([...(o.checklistEntrada||[]), o.checklistObs].filter(Boolean).join(' · '));
+    line(2);
+  }
+  if(o.pecas){ label('PEÇAS APROVEITADAS'); value(o.pecas); line(2); }
+  if(o.obs){ label('OBSERVAÇÃO'); value(o.obs); line(2); }
+
+  label('DATAS'); value(`Entrada: ${fmtDate(o.dataEntrada)}    Conclusão/Entrega: ${fmtDate(o.dataConclusao)}`);
+  line(4);
+
+  const hist = (o.historico||[]).slice().sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  if(hist.length){
+    label('HISTÓRICO'); line(6);
+    pdf.setFontSize(9);
+    hist.forEach(h => {
+      const txt = `${fmtDate(h.data)} — ${h.status}${h.texto ? ': '+h.texto : ''}`;
+      const lines = pdf.splitTextToSize(txt, right-left-4);
+      pdf.text(lines, left+4, y);
+      y += lines.length*4.5;
+      if(y > 275){ pdf.addPage(); y = 18; }
+    });
+    line(4);
+  }
+
+  if(y > 245){ pdf.addPage(); y = 18; } else { line(14); }
+  pdf.setDrawColor(200);
+  pdf.line(left, y, left+75, y);
+  pdf.line(right-75, y, right, y);
+  y += 5;
+  pdf.setFontSize(9);
+  pdf.text('Assinatura do cliente', left, y);
+  pdf.text('Assinatura do responsável técnico', right-75, y);
+  line(10);
+  pdf.setFontSize(8); pdf.setTextColor(140);
+  pdf.text(`Documento gerado em ${fmtDate(todayStr())}`, left, y);
+
+  pdf.save(`${o.id}.pdf`);
+  showToast('O.S. exportada em PDF.');
 }
 
 function confirmDelete(title, subtitle, onConfirm){
