@@ -412,7 +412,7 @@ function renderClientTable(){
   if(list.length === 0){ wrap.innerHTML = `<div class="empty">Nenhum resultado para esse filtro.</div>`; return; }
   wrap.innerHTML = `
     <table><thead><tr>
-      <th>O.S.</th><th>Equipamento</th><th>Patrimônio</th><th>Status</th><th>Entrada</th><th>Conclusão</th><th></th>
+      <th>O.S.</th><th>Equipamento</th><th>Patrimônio</th><th>Status</th><th>Entrada</th><th>Previsão</th><th>Conclusão</th><th></th>
     </tr></thead><tbody>
       ${list.map(o => `
         <tr>
@@ -421,6 +421,7 @@ function renderClientTable(){
           <td data-label="Patrimônio">${escapeHTML(equipPatrimonio(o.equipamentoId))||'—'}</td>
           <td data-label="Status">${statusPill(o.status)}</td>
           <td data-label="Entrada">${fmtDate(o.dataEntrada)}</td>
+          <td data-label="Previsão">${fmtDate(o.previsaoEntrega)}</td>
           <td data-label="Conclusão">${fmtDate(o.dataConclusao)}</td>
           <td data-label=""><button class="row-btn" data-view="${o.id}">Detalhes</button></td>
         </tr>
@@ -436,7 +437,7 @@ function openOsDetailModal(id){
     <h3>${o.id} — ${escapeHTML(equipNome(o.equipamentoId))}</h3>
     <div class="os-meta" style="margin-bottom:14px;">
       ${equipPatrimonio(o.equipamentoId) ? `Patrimônio <span>${escapeHTML(equipPatrimonio(o.equipamentoId))}</span> · ` : ''}
-      Entrada <span>${fmtDate(o.dataEntrada)}</span>${o.dataConclusao ? ` · Conclusão <span>${fmtDate(o.dataConclusao)}</span>`:''}
+      Entrada <span>${fmtDate(o.dataEntrada)}</span>${o.previsaoEntrega ? ` · Previsão <span>${fmtDate(o.previsaoEntrega)}</span>`:''}${o.dataConclusao ? ` · Conclusão <span>${fmtDate(o.dataConclusao)}</span>`:''}
     </div>
     ${statusPill(o.status)}
     ${o.valorOrcamento ? `<div class="os-meta" style="margin-top:10px;">Orçamento <span>${escapeHTML(o.valorOrcamento)}</span></div>` : ''}
@@ -449,6 +450,7 @@ function openOsDetailModal(id){
         <div class="timeline-date">${fmtDate(h.data)}</div>
         <div class="timeline-text"><strong>${escapeHTML(h.status)}</strong>${h.texto?' — '+escapeHTML(h.texto):''}</div></div>`).join('')}
     </div>` : ''}
+    ${o.garantiaDias ? `<div class="os-defeito" style="margin-top:14px;"><strong>Garantia:</strong> ${escapeHTML(o.garantiaDias)} dias${o.garantiaObs ? ' — '+escapeHTML(o.garantiaObs) : ''}</div>` : ''}
     ${o.obs ? `<div class="os-defeito" style="margin-top:14px; margin-bottom:0;">${escapeHTML(o.obs)}</div>` : ''}
     <div class="modal-actions">
       <button class="btn-secondary" id="d-pdf">Baixar O.S. em PDF</button>
@@ -559,7 +561,7 @@ function renderOsTable(){
   if(list.length === 0){ wrap.innerHTML = `<div class="empty">Nenhuma O.S. encontrada.</div>`; return; }
   wrap.innerHTML = `
     <table><thead><tr>
-      <th>O.S.</th><th>Cliente</th><th>Equipamento</th><th>Patrimônio</th><th>Status</th><th>Conclusão</th><th></th>
+      <th>O.S.</th><th>Cliente</th><th>Equipamento</th><th>Patrimônio</th><th>Status</th><th>Entrada</th><th>Previsão</th><th>Conclusão</th><th></th>
     </tr></thead><tbody>
       ${list.map(o => `
         <tr>
@@ -568,6 +570,8 @@ function renderOsTable(){
           <td data-label="Equipamento">${escapeHTML(equipNome(o.equipamentoId))}</td>
           <td data-label="Patrimônio">${escapeHTML(equipPatrimonio(o.equipamentoId))||'—'}</td>
           <td data-label="Status">${statusPill(o.status)}</td>
+          <td data-label="Entrada">${fmtDate(o.dataEntrada)}</td>
+          <td data-label="Previsão">${fmtDate(o.previsaoEntrega)}</td>
           <td data-label="Conclusão">${fmtDate(o.dataConclusao)}</td>
           <td data-label="">
             <button class="row-btn" data-edit="${o.id}">Editar</button>
@@ -636,8 +640,13 @@ function renderOsModalBody(o, editing){
     <div class="field"><label>Status atual</label>
       <select id="m-status">${STATUS_LIST.map(s=>`<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></div>
     <div class="field"><label>Data de entrada</label><input type="date" id="m-entrada" value="${o.dataEntrada||''}"></div>
+    <div class="field"><label>Previsão de entrega</label><input type="date" id="m-previsao" value="${o.previsaoEntrega||''}">
+      <div class="hint" style="margin-top:4px;">Combine um prazo com folga — cumprir antes gera confiança, atrasar gera desconfiança.</div>
+    </div>
     <div class="field"><label>Data de conclusão / entrega</label><input type="date" id="m-conclusao" value="${o.dataConclusao||''}"></div>
     <div class="field"><label>Peças aproveitadas (se houver)</label><input type="text" id="m-pecas" value="${escapeHTML(o.pecas)}"></div>
+    <div class="field"><label>Garantia (dias)</label><input type="number" id="m-garantia-dias" value="${o.garantiaDias||''}" placeholder="Ex: 90" min="0"></div>
+    <div class="field"><label>Condições da garantia</label><textarea id="m-garantia-obs" placeholder="Ex: cobre defeito de fábrica na peça trocada, não cobre mau uso ou dano físico">${escapeHTML(o.garantiaObs)}</textarea></div>
     <div class="field"><label>Observação</label><textarea id="m-obs">${escapeHTML(o.obs)}</textarea></div>
     <div class="modal-actions">
       <button class="btn-secondary" id="m-cancel">Cancelar</button>
@@ -662,8 +671,11 @@ function renderOsModalBody(o, editing){
       checklistObs: document.getElementById('m-check-obs').value.trim(),
       status: document.getElementById('m-status').value,
       dataEntrada: document.getElementById('m-entrada').value,
+      previsaoEntrega: document.getElementById('m-previsao').value,
       dataConclusao: document.getElementById('m-conclusao').value,
       pecas: document.getElementById('m-pecas').value.trim(),
+      garantiaDias: document.getElementById('m-garantia-dias').value.trim(),
+      garantiaObs: document.getElementById('m-garantia-obs').value.trim(),
       obs: document.getElementById('m-obs').value.trim(),
     };
     if(!data.equipamentoId){ showToast('Selecione (ou cadastre) o equipamento.'); return; }
@@ -990,11 +1002,11 @@ function closeModal(){ const el = document.getElementById('modal-overlay'); if(e
 /* ---------------- EXPORT ---------------- */
 function exportCSV(list){
   if(!list || list.length === 0){ showToast('Nada para exportar com esse filtro.'); return; }
-  const headers = ['O.S.','Cliente','Equipamento','Patrimônio','Status','Defeito relatado','Diagnóstico técnico','Valor orçamento','Entrada','Conclusão','Peças aproveitadas','Observação'];
+  const headers = ['O.S.','Cliente','Equipamento','Patrimônio','Status','Defeito relatado','Diagnóstico técnico','Valor orçamento','Entrada','Previsão','Conclusão','Peças aproveitadas','Garantia (dias)','Condições garantia','Observação'];
   const rows = list.map(o => [
     o.id, clienteNome(o.clienteId), equipNome(o.equipamentoId), equipPatrimonio(o.equipamentoId),
     o.status, o.defeitoRelatado||'', o.diagnosticoTecnico||'', o.valorOrcamento||'',
-    fmtDate(o.dataEntrada), fmtDate(o.dataConclusao), o.pecas||'', o.obs||''
+    fmtDate(o.dataEntrada), fmtDate(o.previsaoEntrega), fmtDate(o.dataConclusao), o.pecas||'', o.garantiaDias||'', o.garantiaObs||'', o.obs||''
   ]);
   const escCsv = (v) => `"${String(v??'').replace(/"/g,'""')}"`;
   const csv = [headers, ...rows].map(r => r.map(escCsv).join(';')).join('\r\n');
@@ -1082,9 +1094,10 @@ function exportSingleOsPDF(o){
     line(2);
   }
   if(o.pecas){ label('PEÇAS APROVEITADAS'); value(o.pecas); line(2); }
+  if(o.garantiaDias){ label('GARANTIA'); value(`${o.garantiaDias} dias${o.garantiaObs ? ' — '+o.garantiaObs : ''}`); line(2); }
   if(o.obs){ label('OBSERVAÇÃO'); value(o.obs); line(2); }
 
-  label('DATAS'); value(`Entrada: ${fmtDate(o.dataEntrada)}    Conclusão/Entrega: ${fmtDate(o.dataConclusao)}`);
+  label('DATAS'); value(`Entrada: ${fmtDate(o.dataEntrada)}    Previsão: ${fmtDate(o.previsaoEntrega)}    Conclusão/Entrega: ${fmtDate(o.dataConclusao)}`);
   line(4);
 
   const hist = (o.historico||[]).slice().sort((a,b)=>(a.data||'').localeCompare(b.data||''));
