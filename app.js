@@ -2,7 +2,7 @@ import { firebaseConfig } from './firebase-config.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs, writeBatch
+  getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs, writeBatch, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 
@@ -73,10 +73,23 @@ function fmtDate(d){
   return dt.toLocaleDateString('pt-BR');
 }
 function uid(prefix){ return prefix + '-' + Math.random().toString(36).slice(2,8); }
-function nextOsId(){
-  const nums = ORDENS.map(o => parseInt((o.id||'').replace(/\D/g,''),10)).filter(n=>!isNaN(n));
-  const next = (nums.length ? Math.max(...nums) : 0) + 1;
-  return 'OS-' + String(next).padStart(4,'0');
+async function reserveNextOsId(){
+  const counterRef = doc(db, 'config', 'counters');
+  const nextNumber = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(counterRef);
+    let current = 0;
+    if(snap.exists() && typeof snap.data().nextOs === 'number'){
+      current = snap.data().nextOs;
+    } else {
+      // Primeira vez rodando isso: parte do maior número já usado localmente.
+      const nums = ORDENS.map(o => parseInt((o.id||'').replace(/\D/g,''),10)).filter(n=>!isNaN(n));
+      current = nums.length ? Math.max(...nums) : 0;
+    }
+    const next = current + 1;
+    tx.set(counterRef, { nextOs: next }, { merge: true });
+    return next;
+  });
+  return 'OS-' + String(nextNumber).padStart(4,'0');
 }
 function escapeHTML(str){
   if(str === null || str === undefined) return '';
@@ -613,7 +626,7 @@ function renderOsTable(){
 function openOsModal(id){
   const editing = !!id;
   const o = editing ? ORDENS.find(x=>x.id===id) : {
-    id: nextOsId(), clienteId: CLIENTES[0]?.id || '', equipamentoId:'',
+    id: null, clienteId: CLIENTES[0]?.id || '', equipamentoId:'',
     defeitoRelatado:'', diagnosticoTecnico:'', valorOrcamento:'',
     checklistEntrada:[], checklistObs:'', fotoEntradaUrl:'',
     status:'Em análise', dataEntrada: todayStr(), dataConclusao:'', pecas:'', obs:'', historico:[]
@@ -697,8 +710,15 @@ function renderOsModalBody(o, editing){
     const file = fotoInput.files[0];
     saveBtn.disabled = true; saveBtn.textContent = 'Salvando...';
     let target;
-    if(editing){ Object.assign(o, data); target = o; }
-    else { target = { id:o.id, fotoEntradaUrl:'', historico:[{data:data.dataEntrada||todayStr(), status:data.status, texto:'O.S. aberta.'}], ...data }; ORDENS.push(target); }
+    if(editing){
+      Object.assign(o, data); target = o;
+    } else {
+      let newId;
+      try{ newId = await reserveNextOsId(); }
+      catch(e){ showToast('Erro ao gerar número da O.S.: '+e.message); saveBtn.disabled=false; saveBtn.textContent='Criar O.S.'; return; }
+      target = { id:newId, fotoEntradaUrl:'', historico:[{data:data.dataEntrada||todayStr(), status:data.status, texto:'O.S. aberta.'}], ...data };
+      ORDENS.push(target);
+    }
     if(file){
       try{ target.fotoEntradaUrl = await uploadFotoEntrada(file, target.id); }
       catch(e){ showToast('Não foi possível enviar a foto: '+e.message); }
