@@ -454,10 +454,12 @@ function openOsDetailModal(id){
     ${o.obs ? `<div class="os-defeito" style="margin-top:14px; margin-bottom:0;">${escapeHTML(o.obs)}</div>` : ''}
     <div class="modal-actions">
       <button class="btn-secondary" id="d-pdf">Baixar O.S. em PDF</button>
+      <button class="btn-secondary" id="d-recibo">Baixar Recibo</button>
       <button class="btn-secondary" id="d-close">Fechar</button>
     </div>
   `);
   document.getElementById('d-pdf').onclick = () => exportSingleOsPDF(o);
+  document.getElementById('d-recibo').onclick = () => exportRecibo(o);
   document.getElementById('d-close').onclick = closeModal;
 }
 
@@ -577,6 +579,7 @@ function renderOsTable(){
             <button class="row-btn" data-edit="${o.id}">Editar</button>
             <button class="row-btn" data-hist="${o.id}">+ Status</button>
             <button class="row-btn" data-print="${o.id}">Imprimir</button>
+            <button class="row-btn" data-recibo="${o.id}">Recibo</button>
             <button class="row-btn row-btn-danger" data-del="${o.id}">Excluir</button>
           </td>
         </tr>
@@ -586,6 +589,7 @@ function renderOsTable(){
   wrap.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openOsModal(b.dataset.edit));
   wrap.querySelectorAll('[data-hist]').forEach(b => b.onclick = () => openHistModal(b.dataset.hist));
   wrap.querySelectorAll('[data-print]').forEach(b => b.onclick = () => exportSingleOsPDF(ORDENS.find(x=>x.id===b.dataset.print)));
+  wrap.querySelectorAll('[data-recibo]').forEach(b => b.onclick = () => exportRecibo(ORDENS.find(x=>x.id===b.dataset.recibo)));
   wrap.querySelectorAll('[data-del]').forEach(b => b.onclick = () => confirmDelete(
     `Excluir a O.S. ${b.dataset.del}?`, 'Essa ação não pode ser desfeita.',
     async () => {
@@ -1128,6 +1132,57 @@ function exportSingleOsPDF(o){
 
   pdf.save(`${o.id}.pdf`);
   showToast('O.S. exportada em PDF.');
+}
+
+function exportRecibo(o){
+  if(!o){ showToast('O.S. não encontrada.'); return; }
+  if(!window.jspdf){ showToast('Biblioteca de PDF ainda carregando, tente novamente em instantes.'); return; }
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation:'portrait' });
+  const c = clienteById(o.clienteId);
+  const e = equipById(o.equipamentoId);
+  const left = 14, right = 196;
+  let y = 20;
+
+  pdf.setFontSize(16); pdf.setFont(undefined,'bold');
+  pdf.text('RECIBO DE PAGAMENTO', 105, y, { align:'center' });
+  y += 8;
+  pdf.setFontSize(9); pdf.setFont(undefined,'normal'); pdf.setTextColor(110);
+  pdf.text('Rafael / Eduardo — (41) 9131-2064 — garage1240.oficial@gmail.com', 105, y, { align:'center' });
+  pdf.setTextColor(0);
+  y += 6;
+  pdf.setDrawColor(200); pdf.line(left, y, right, y);
+  y += 14;
+
+  pdf.setFontSize(11);
+  const valorTxt = o.valorOrcamento ? o.valorOrcamento : '—';
+  pdf.text(`Valor: ${valorTxt}`, left, y);
+  y += 12;
+
+  const paragrafo = `Recebi de ${c ? c.nome : 'cliente'}${c && c.documento ? ' (CPF/CNPJ: '+c.documento+')' : ''} a quantia acima referente ao serviço de ${o.diagnosticoTecnico || o.defeitoRelatado || 'manutenção'} prestado no equipamento ${e ? e.nome : equipNome(o.equipamentoId)}${e && e.patrimonio ? ' (patrimônio '+e.patrimonio+')' : ''}, referente à O.S. ${o.id}, dando plena quitação pelo valor recebido.`;
+  const lines = pdf.splitTextToSize(paragrafo, right-left);
+  pdf.setFontSize(11);
+  pdf.text(lines, left, y);
+  y += lines.length * 6 + 10;
+
+  pdf.setFontSize(10);
+  pdf.text(`Data: ${fmtDate(todayStr())}`, left, y);
+  y += 30;
+
+  pdf.setDrawColor(200);
+  pdf.line(left+35, y, left+35+90, y);
+  y += 5;
+  pdf.setFontSize(9);
+  pdf.text('Assinatura do responsável técnico', left+35, y, { align:'center' });
+  y += 16;
+
+  pdf.setFontSize(8); pdf.setTextColor(140);
+  const aviso = 'Este recibo comprova o pagamento do serviço, mas não substitui a Nota Fiscal de Serviço Eletrônica (NFS-e), quando exigida por lei.';
+  const avisoLines = pdf.splitTextToSize(aviso, right-left);
+  pdf.text(avisoLines, left, y);
+
+  pdf.save(`recibo-${o.id}.pdf`);
+  showToast('Recibo exportado.');
 }
 
 function confirmDelete(title, subtitle, onConfirm){
