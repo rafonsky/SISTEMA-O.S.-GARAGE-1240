@@ -13,6 +13,7 @@ let storage = null;
 try{ storage = getStorage(app); }catch(e){ storage = null; }
 
 const STATUS_META = {
+  "Em análise":                      { color:"#38BDF8", bg:"#0f2e3d", pulse:true },
   "Aguardando aprovação":             { color:"#A78BFA", bg:"#2b2140", pulse:true },
   "Em andamento":                    { color:"#E8A33D", bg:"#3a2c10", pulse:true },
   "Aguardando peça":                 { color:"#E8A33D", bg:"#3a2c10", pulse:false },
@@ -37,6 +38,20 @@ let CLIENTES = [];     // Firestore: collection "clientes"
 let EQUIPAMENTOS = []; // Firestore: collection "equipamentos"
 let ORDENS = [];        // Firestore: collection "ordens"
 let session = { role: null, clientId: null };
+const SESSION_KEY = 'osportal_session';
+function saveSession(){
+  try{ localStorage.setItem(SESSION_KEY, JSON.stringify(session)); }catch(e){ /* ignora se bloqueado */ }
+}
+function loadSession(){
+  try{
+    const raw = localStorage.getItem(SESSION_KEY);
+    if(!raw) return { role:null, clientId:null };
+    return JSON.parse(raw);
+  }catch(e){ return { role:null, clientId:null }; }
+}
+function clearSession(){
+  try{ localStorage.removeItem(SESSION_KEY); }catch(e){ /* ignora */ }
+}
 let loginTab = 'cliente';
 let adminTab = 'ordens';
 
@@ -285,23 +300,41 @@ function renderLoginBody(){
   if(loginTab === 'cliente'){
     box.innerHTML = `
       <div class="field"><label>PIN de acesso</label>
-        <input type="password" inputmode="numeric" id="pin-input" placeholder="•••• ••••" maxlength="10"></div>
+        <div class="input-with-toggle">
+          <input type="password" inputmode="numeric" id="pin-input" placeholder="•••• ••••" maxlength="10">
+          <button type="button" class="toggle-visibility" id="pin-toggle" aria-label="Mostrar PIN">👁</button>
+        </div>
+      </div>
       <button class="btn-primary" id="pin-submit">Entrar</button>
       <div class="err" id="login-err"></div>
       <div class="hint">O PIN é fornecido pela oficina. Cada cliente tem um código próprio.</div>
     `;
     document.getElementById('pin-submit').onclick = tryClientLogin;
     document.getElementById('pin-input').addEventListener('keydown', e => { if(e.key==='Enter') tryClientLogin(); });
+    document.getElementById('pin-toggle').onclick = () => togglePasswordField('pin-input', 'pin-toggle');
   } else {
     box.innerHTML = `
-      <div class="field"><label>Senha da oficina</label><input type="password" id="pass-input" placeholder="••••••••"></div>
+      <div class="field"><label>Senha da oficina</label>
+        <div class="input-with-toggle">
+          <input type="password" id="pass-input" placeholder="••••••••">
+          <button type="button" class="toggle-visibility" id="pass-toggle" aria-label="Mostrar senha">👁</button>
+        </div>
+      </div>
       <button class="btn-primary" id="pass-submit">Entrar</button>
       <div class="err" id="login-err"></div>
       <div class="hint">Acesso restrito à equipe (Rafael / Eduardo).</div>
     `;
     document.getElementById('pass-submit').onclick = tryAdminLogin;
     document.getElementById('pass-input').addEventListener('keydown', e => { if(e.key==='Enter') tryAdminLogin(); });
+    document.getElementById('pass-toggle').onclick = () => togglePasswordField('pass-input', 'pass-toggle');
   }
+}
+function togglePasswordField(inputId, btnId){
+  const input = document.getElementById(inputId);
+  const btn = document.getElementById(btnId);
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  btn.classList.toggle('active', !showing);
 }
 function tryClientLogin(){
   const pin = document.getElementById('pin-input').value.trim();
@@ -310,6 +343,7 @@ function tryClientLogin(){
   if(!client){ err.textContent = 'PIN inválido. Verifique com a oficina.'; return; }
   session = { role:'client', clientId: client.id };
   filters.client = { q:'', status:'' };
+  saveSession();
   render();
 }
 function tryAdminLogin(){
@@ -318,9 +352,10 @@ function tryAdminLogin(){
   if(pass !== CONFIG.adminPassword){ err.textContent = 'Senha incorreta.'; return; }
   session = { role:'admin', clientId:null };
   adminTab = 'ordens';
+  saveSession();
   render();
 }
-function logout(){ session = { role:null, clientId:null }; render(); }
+function logout(){ session = { role:null, clientId:null }; clearSession(); render(); }
 
 /* ---------------- STATUS PILL ---------------- */
 function statusPill(status){
@@ -563,7 +598,7 @@ function openOsModal(id){
     id: nextOsId(), clienteId: CLIENTES[0]?.id || '', equipamentoId:'',
     defeitoRelatado:'', diagnosticoTecnico:'', valorOrcamento:'',
     checklistEntrada:[], checklistObs:'', fotoEntradaUrl:'',
-    status:'Aguardando aprovação', dataEntrada: todayStr(), dataConclusao:'', pecas:'', obs:'', historico:[]
+    status:'Em análise', dataEntrada: todayStr(), dataConclusao:'', pecas:'', obs:'', historico:[]
   };
   renderOsModalBody(o, editing);
 }
@@ -1103,6 +1138,16 @@ function confirmDelete(title, subtitle, onConfirm){
       signInAnonymously(auth).catch(reject);
     });
     await loadData();
+    const saved = loadSession();
+    if(saved.role === 'admin'){
+      session = saved;
+    } else if(saved.role === 'client' && clienteById(saved.clientId)){
+      session = saved;
+      filters.client = { q:'', status:'' };
+    } else {
+      session = { role:null, clientId:null };
+      clearSession();
+    }
     render();
   }catch(e){
     $app.innerHTML = `<div class="loading">Erro ao conectar no Firestore: ${escapeHTML(e.message)}<br><br>Confira se preencheu firebase-config.js e se o Firestore/Authentication (Anônimo) estão ativados no seu projeto Firebase.</div>`;
