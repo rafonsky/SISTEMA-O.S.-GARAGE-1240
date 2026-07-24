@@ -88,6 +88,16 @@ function clienteNome(id){ const c = clienteById(id); return c ? c.nome : '—'; 
 function equipNome(id){ const e = equipById(id); return e ? e.nome : '—'; }
 function equipPatrimonio(id){ const e = equipById(id); return e ? e.patrimonio : ''; }
 function uniqueSorted(arr){ return [...new Set(arr.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')); }
+function equipLabel(id){
+  const e = equipById(id);
+  if(!e) return '—';
+  return e.patrimonio ? `${e.nome} (${e.patrimonio})` : e.nome;
+}
+function uniqueEquipOptions(ids){
+  const seen = new Map();
+  ids.filter(Boolean).forEach(id => { if(!seen.has(id)) seen.set(id, equipLabel(id)); });
+  return [...seen.entries()].sort((a,b) => a[1].localeCompare(b[1],'pt-BR'));
+}
 function normalizePhone(phone){
   let digits = (phone||'').replace(/\D/g,'');
   if(!digits) return '';
@@ -367,7 +377,7 @@ function statusPill(status){
 function renderClientDashboard(){
   const client = clienteById(session.clientId);
   const all = ORDENS.filter(o => o.clienteId === session.clientId);
-  const equipOpts = uniqueSorted(all.map(o => equipNome(o.equipamentoId)));
+  const equipOpts = uniqueEquipOptions(all.map(o => o.equipamentoId));
 
   $app.innerHTML = `
     <div class="topbar">
@@ -383,7 +393,7 @@ function renderClientDashboard(){
       <div class="filter-bar">
         <input class="search-input" id="f-q" placeholder="Buscar equipamento, patrimônio, O.S..." value="${escapeHTML(filters.client.q)}">
         <select class="select" id="f-equip"><option value="">Todos os equipamentos</option>
-          ${equipOpts.map(e=>`<option ${filters.client.equip===e?'selected':''}>${escapeHTML(e)}</option>`).join('')}
+          ${equipOpts.map(([id,label])=>`<option value="${id}" ${filters.client.equip===id?'selected':''}>${escapeHTML(label)}</option>`).join('')}
         </select>
         <select class="select" id="f-status"><option value="">Todos os status</option>
           ${STATUS_LIST.map(s=>`<option value="${s}" ${filters.client.status===s?'selected':''}>${s}</option>`).join('')}
@@ -404,7 +414,7 @@ function renderClientTable(){
   let list = ORDENS.filter(o => o.clienteId === session.clientId).filter(o => {
     const eqNome = equipNome(o.equipamentoId), eqPat = equipPatrimonio(o.equipamentoId);
     const matchesQ = !q || [o.id, eqNome, eqPat].join(' ').toLowerCase().includes(q);
-    const matchesEquip = !filters.client.equip || eqNome === filters.client.equip;
+    const matchesEquip = !filters.client.equip || o.equipamentoId === filters.client.equip;
     const matchesStatus = !filters.client.status || o.status === filters.client.status;
     return matchesQ && matchesEquip && matchesStatus;
   }).sort((a,b) => (b.dataConclusao||b.dataEntrada||'').localeCompare(a.dataConclusao||a.dataEntrada||''));
@@ -499,16 +509,16 @@ function renderAdminDashboard(){
 /* ---------------- ADMIN · ORDENS ---------------- */
 function renderAdminOrdens(){
   const body = document.getElementById('admin-body');
-  const clienteOpts = uniqueSorted(CLIENTES.map(c=>c.nome));
-  const equipOpts = uniqueSorted(ORDENS.map(o=>equipNome(o.equipamentoId)));
+  const clienteOpts = CLIENTES.slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+  const equipOpts = uniqueEquipOptions(ORDENS.map(o=>o.equipamentoId));
   body.innerHTML = `
     <div class="stats-bar" id="stats-bar"></div>
     <div class="filter-bar">
       <input class="search-input" id="f-q" placeholder="Buscar O.S., equipamento, patrimônio..." value="${escapeHTML(filters.ordens.q)}">
       <select class="select" id="f-cliente"><option value="">Todos os clientes</option>
-        ${clienteOpts.map(c=>`<option ${filters.ordens.cliente===c?'selected':''}>${escapeHTML(c)}</option>`).join('')}</select>
+        ${clienteOpts.map(c=>`<option value="${c.id}" ${filters.ordens.cliente===c.id?'selected':''}>${escapeHTML(c.nome)}</option>`).join('')}</select>
       <select class="select" id="f-equip"><option value="">Todos os equipamentos</option>
-        ${equipOpts.map(e=>`<option ${filters.ordens.equipamento===e?'selected':''}>${escapeHTML(e)}</option>`).join('')}</select>
+        ${equipOpts.map(([id,label])=>`<option value="${id}" ${filters.ordens.equipamento===id?'selected':''}>${escapeHTML(label)}</option>`).join('')}</select>
       <select class="select" id="f-status"><option value="">Todos os status</option>
         ${STATUS_LIST.map(s=>`<option value="${s}" ${filters.ordens.status===s?'selected':''}>${s}</option>`).join('')}</select>
       <button class="btn-secondary" id="export-csv-btn">Exportar Excel (CSV)</button>
@@ -553,8 +563,8 @@ function renderOsTable(){
   let list = ORDENS.filter(o => {
     const eqNome = equipNome(o.equipamentoId), eqPat = equipPatrimonio(o.equipamentoId), cliNome = clienteNome(o.clienteId);
     const matchesQ = !q || [o.id, eqNome, eqPat, cliNome].join(' ').toLowerCase().includes(q);
-    const matchesCliente = !filters.ordens.cliente || cliNome === filters.ordens.cliente;
-    const matchesEquip = !filters.ordens.equipamento || eqNome === filters.ordens.equipamento;
+    const matchesCliente = !filters.ordens.cliente || o.clienteId === filters.ordens.cliente;
+    const matchesEquip = !filters.ordens.equipamento || o.equipamentoId === filters.ordens.equipamento;
     const matchesStatus = !filters.ordens.status || o.status === filters.ordens.status;
     return matchesQ && matchesCliente && matchesEquip && matchesStatus;
   }).sort((a,b) => b.id.localeCompare(a.id));
@@ -744,12 +754,12 @@ function openHistModal(id){
 /* ---------------- ADMIN · EQUIPAMENTOS ---------------- */
 function renderAdminEquip(){
   const body = document.getElementById('admin-body');
-  const clienteOpts = uniqueSorted(CLIENTES.map(c=>c.nome));
+  const clienteOpts = CLIENTES.slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
   body.innerHTML = `
     <div class="filter-bar">
       <input class="search-input" id="f-q" placeholder="Buscar equipamento, patrimônio..." value="${escapeHTML(filters.equip.q)}">
       <select class="select" id="f-cliente"><option value="">Todos os clientes</option>
-        ${clienteOpts.map(c=>`<option ${filters.equip.cliente===c?'selected':''}>${escapeHTML(c)}</option>`).join('')}</select>
+        ${clienteOpts.map(c=>`<option value="${c.id}" ${filters.equip.cliente===c.id?'selected':''}>${escapeHTML(c.nome)}</option>`).join('')}</select>
       <select class="select" id="f-tipo"><option value="">Todos os tipos</option>
         ${TIPO_LIST.map(t=>`<option ${filters.equip.tipo===t?'selected':''}>${t}</option>`).join('')}</select>
       <button class="btn-small-primary" id="new-equip-btn">+ Novo equipamento</button>
@@ -768,7 +778,7 @@ function renderEquipTable(){
   let list = EQUIPAMENTOS.filter(e => {
     const cliNome = clienteNome(e.clienteId);
     const matchesQ = !q || [e.nome, e.patrimonio, e.marca, e.modelo, cliNome].join(' ').toLowerCase().includes(q);
-    const matchesCliente = !filters.equip.cliente || cliNome === filters.equip.cliente;
+    const matchesCliente = !filters.equip.cliente || e.clienteId === filters.equip.cliente;
     const matchesTipo = !filters.equip.tipo || e.tipo === filters.equip.tipo;
     return matchesQ && matchesCliente && matchesTipo;
   }).sort((a,b) => a.nome.localeCompare(b.nome,'pt-BR'));
@@ -797,7 +807,7 @@ function renderEquipTable(){
   wrap.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEquipModal(b.dataset.edit, null));
   wrap.querySelectorAll('[data-viewos]').forEach(b => b.onclick = () => {
     const e = equipById(b.dataset.viewos);
-    filters.ordens = { q:'', cliente: clienteNome(e.clienteId), equipamento: e.nome, status:'' };
+    filters.ordens = { q:'', cliente: e.clienteId, equipamento: e.id, status:'' };
     adminTab = 'ordens';
     render();
   });
