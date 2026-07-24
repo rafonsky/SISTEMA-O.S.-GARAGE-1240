@@ -165,6 +165,16 @@
   .toolbar{display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;}
   .filter-bar{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:16px;}
   .filter-bar .btn-small-primary{margin-left:auto;}
+  .stats-bar{display:flex; flex-wrap:wrap; gap:10px; margin-bottom:18px;}
+  .stat-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 16px;
+    cursor:pointer; min-width:110px; transition: border-color .15s;
+    border-top:3px solid var(--stat-color, var(--line));
+  }
+  .stat-card:hover{border-color:var(--amber);}
+  .stat-card.active{background:var(--panel-2); border-color:var(--amber);}
+  .stat-n{font-family:var(--font-display); font-size:22px; font-weight:700; line-height:1.1;}
+  .stat-label{font-size:11px; color:var(--text-dim); margin-top:3px; max-width:130px;}
   .row-btn-danger{border-color:#4A2422; color:#E2574C;}
   .row-btn-danger:hover{border-color:#E2574C; color:#E2574C; background:rgba(226,87,76,0.08);}
   .btn-danger-solid{background:var(--danger); color:#fff;}
@@ -244,6 +254,8 @@
 </head>
 <body>
 <div id="app"><div class="loading">Conectando ao Firestore…</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

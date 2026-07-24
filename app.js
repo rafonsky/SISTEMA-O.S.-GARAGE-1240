@@ -19,7 +19,7 @@ const STATUS_META = {
 const STATUS_LIST = Object.keys(STATUS_META);
 const TIPO_LIST = ["Notebook", "Desktop", "Periférico", "Outro"];
 
-let CONFIG = { adminPassword: 'garage1240' };
+let CONFIG = { adminPassword: 'garage1240', siteUrl: '' };
 let CLIENTES = [];     // Firestore: collection "clientes"
 let EQUIPAMENTOS = []; // Firestore: collection "equipamentos"
 let ORDENS = [];        // Firestore: collection "ordens"
@@ -60,6 +60,18 @@ function clienteNome(id){ const c = clienteById(id); return c ? c.nome : '—'; 
 function equipNome(id){ const e = equipById(id); return e ? e.nome : '—'; }
 function equipPatrimonio(id){ const e = equipById(id); return e ? e.patrimonio : ''; }
 function uniqueSorted(arr){ return [...new Set(arr.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')); }
+function normalizePhone(phone){
+  let digits = (phone||'').replace(/\D/g,'');
+  if(!digits) return '';
+  if(digits.length <= 11) digits = '55' + digits; // assume BR, prefix country code
+  return digits;
+}
+function whatsAppLink(phone, message){
+  const digits = normalizePhone(phone);
+  if(!digits) return null;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
+let currentOsList = []; // last rendered/filtered O.S. list, used by export buttons
 
 function showToast(msg){
   let t = document.getElementById('toast');
@@ -77,7 +89,7 @@ function showToast(msg){
 /* ---------------- SEED (fresh install) ---------------- */
 function freshSeed(){
   const clientId = 'cli-stageav';
-  CONFIG = { adminPassword: 'garage1240' };
+  CONFIG = { adminPassword: 'garage1240', siteUrl: '' };
   CLIENTES = [{ id: clientId, nome: 'Stage Audio Visual', telefone:'', email:'', documento:'', endereco:'', pin: '2026' }];
 
   const base = [
@@ -140,7 +152,7 @@ async function loadData(){
 
   // --- load what exists ---
   const oldAuthData = authSnap.exists() ? authSnap.data() : {};
-  CONFIG = { adminPassword: oldAuthData.adminPassword || 'garage1240' };
+  CONFIG = { adminPassword: oldAuthData.adminPassword || 'garage1240', siteUrl: oldAuthData.siteUrl || '' };
   CLIENTES = clientesSnap.docs.map(d => d.data());
   EQUIPAMENTOS = equipSnap.docs.map(d => d.data());
   ORDENS = ordensSnap.docs.map(d => d.data());
@@ -404,6 +416,7 @@ function renderAdminOrdens(){
   const clienteOpts = uniqueSorted(CLIENTES.map(c=>c.nome));
   const equipOpts = uniqueSorted(ORDENS.map(o=>equipNome(o.equipamentoId)));
   body.innerHTML = `
+    <div class="stats-bar" id="stats-bar"></div>
     <div class="filter-bar">
       <input class="search-input" id="f-q" placeholder="Buscar O.S., equipamento, patrimônio..." value="${escapeHTML(filters.ordens.q)}">
       <select class="select" id="f-cliente"><option value="">Todos os clientes</option>
@@ -412,16 +425,41 @@ function renderAdminOrdens(){
         ${equipOpts.map(e=>`<option ${filters.ordens.equipamento===e?'selected':''}>${escapeHTML(e)}</option>`).join('')}</select>
       <select class="select" id="f-status"><option value="">Todos os status</option>
         ${STATUS_LIST.map(s=>`<option value="${s}" ${filters.ordens.status===s?'selected':''}>${s}</option>`).join('')}</select>
+      <button class="btn-secondary" id="export-csv-btn">Exportar Excel (CSV)</button>
+      <button class="btn-secondary" id="export-pdf-btn">Exportar PDF</button>
       <button class="btn-small-primary" id="new-os-btn">+ Nova O.S.</button>
     </div>
     <div id="os-table-wrap"></div>
   `;
+  renderStatsBar();
   document.getElementById('f-q').oninput = e => { filters.ordens.q = e.target.value; renderOsTable(); };
   document.getElementById('f-cliente').onchange = e => { filters.ordens.cliente = e.target.value; renderOsTable(); };
   document.getElementById('f-equip').onchange = e => { filters.ordens.equipamento = e.target.value; renderOsTable(); };
   document.getElementById('f-status').onchange = e => { filters.ordens.status = e.target.value; renderOsTable(); };
   document.getElementById('new-os-btn').onclick = () => openOsModal(null);
+  document.getElementById('export-csv-btn').onclick = () => exportCSV(currentOsList);
+  document.getElementById('export-pdf-btn').onclick = () => exportPDF(currentOsList);
   renderOsTable();
+}
+function renderStatsBar(){
+  const bar = document.getElementById('stats-bar');
+  if(!bar) return;
+  const total = ORDENS.length;
+  const counts = STATUS_LIST.map(s => ({ status:s, n: ORDENS.filter(o=>o.status===s).length }));
+  bar.innerHTML = `
+    <div class="stat-card ${!filters.ordens.status?'active':''}" data-stat="">
+      <div class="stat-n">${total}</div><div class="stat-label">Total de O.S.</div>
+    </div>
+    ${counts.map(c => `
+      <div class="stat-card ${filters.ordens.status===c.status?'active':''}" data-stat="${c.status}" style="--stat-color:${STATUS_META[c.status].color};">
+        <div class="stat-n">${c.n}</div><div class="stat-label">${c.status}</div>
+      </div>
+    `).join('')}
+  `;
+  bar.querySelectorAll('[data-stat]').forEach(el => el.onclick = () => {
+    filters.ordens.status = el.dataset.stat;
+    renderAdminOrdens();
+  });
 }
 function renderOsTable(){
   const wrap = document.getElementById('os-table-wrap');
@@ -434,6 +472,7 @@ function renderOsTable(){
     const matchesStatus = !filters.ordens.status || o.status === filters.ordens.status;
     return matchesQ && matchesCliente && matchesEquip && matchesStatus;
   }).sort((a,b) => b.id.localeCompare(a.id));
+  currentOsList = list;
 
   if(list.length === 0){ wrap.innerHTML = `<div class="empty">Nenhuma O.S. encontrada.</div>`; return; }
   wrap.innerHTML = `
@@ -532,12 +571,18 @@ function renderOsModalBody(o, editing){
 
 function openHistModal(id){
   const o = ORDENS.find(x=>x.id===id);
+  const c = clienteById(o.clienteId);
   openModal(`
     <h3>Atualizar status — ${o.id}</h3>
     <div class="field"><label>Novo status</label>
       <select id="h-status">${STATUS_LIST.map(s=>`<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></div>
     <div class="field"><label>Data</label><input type="date" id="h-data" value="${todayStr()}"></div>
     <div class="field"><label>Observação (aparece para o cliente)</label><textarea id="h-texto" placeholder="Ex: peça a caminho, previsão de 3 dias"></textarea></div>
+    ${c && c.telefone ? `
+    <div class="field" style="display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" id="h-avisar" checked style="width:auto;">
+      <label for="h-avisar" style="margin:0;">Avisar ${escapeHTML(c.nome)} por WhatsApp</label>
+    </div>` : ''}
     <div class="modal-actions">
       <button class="btn-secondary" id="h-cancel">Cancelar</button>
       <button class="btn-small-primary" id="h-save">Adicionar</button>
@@ -548,12 +593,20 @@ function openHistModal(id){
     const status = document.getElementById('h-status').value;
     const data = document.getElementById('h-data').value || todayStr();
     const texto = document.getElementById('h-texto').value.trim();
+    const avisar = document.getElementById('h-avisar')?.checked;
     o.status = status;
     if(status === 'Concluído' || status === 'Entregue ao cliente'){ o.dataConclusao = data; }
     o.historico = o.historico || [];
     o.historico.push({ data, status, texto });
     await saveOrdem(o);
-    closeModal(); render();
+    closeModal();
+    if(avisar && c && c.telefone){
+      const link = CONFIG.siteUrl ? `\n\nAcompanhe em: ${CONFIG.siteUrl}` : '';
+      const msg = `Olá, ${c.nome}! Atualização da sua O.S. ${o.id} (${equipNome(o.equipamentoId)}):\n\nNovo status: ${status}${texto ? '\n'+texto : ''}${link}`;
+      const url = whatsAppLink(c.telefone, msg);
+      if(url) window.open(url, '_blank');
+    }
+    render();
     showToast('Status atualizado.');
   };
 }
@@ -602,7 +655,7 @@ function renderEquipTable(){
           <td data-label="Cliente">${escapeHTML(clienteNome(e.clienteId))}</td>
           <td data-label="Patrimônio">${escapeHTML(e.patrimonio)||'—'}</td>
           <td data-label="Marca/Modelo">${escapeHTML([e.marca,e.modelo].filter(Boolean).join(' / '))||'—'}</td>
-          <td data-label="O.S.">${ORDENS.filter(o=>o.equipamentoId===e.id).length}</td>
+          <td data-label="O.S."><button class="row-btn" data-viewos="${e.id}">${ORDENS.filter(o=>o.equipamentoId===e.id).length}</button></td>
           <td data-label="">
             <button class="row-btn" data-edit="${e.id}">Editar</button>
             <button class="row-btn row-btn-danger" data-del="${e.id}">Excluir</button>
@@ -612,6 +665,12 @@ function renderEquipTable(){
     </tbody></table>
   `;
   wrap.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEquipModal(b.dataset.edit, null));
+  wrap.querySelectorAll('[data-viewos]').forEach(b => b.onclick = () => {
+    const e = equipById(b.dataset.viewos);
+    filters.ordens = { q:'', cliente: clienteNome(e.clienteId), equipamento: e.nome, status:'' };
+    adminTab = 'ordens';
+    render();
+  });
   wrap.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
     const linked = ORDENS.filter(o=>o.equipamentoId===b.dataset.del).length;
     if(linked > 0){ showToast(`Não é possível excluir: há ${linked} O.S. vinculada(s) a este equipamento.`); return; }
@@ -694,6 +753,7 @@ function renderClientTableAdmin(){
           <td data-label="O.S.">${ORDENS.filter(o=>o.clienteId===c.id).length}</td>
           <td data-label="">
             <button class="row-btn" data-edit="${c.id}">Editar</button>
+            ${c.telefone ? `<button class="row-btn" data-wa="${c.id}">WhatsApp</button>` : ''}
             <button class="row-btn row-btn-danger" data-del="${c.id}">Excluir</button>
           </td>
         </tr>
@@ -701,6 +761,14 @@ function renderClientTableAdmin(){
     </tbody></table>
   `;
   wrap.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openClientModal(b.dataset.edit));
+  wrap.querySelectorAll('[data-wa]').forEach(b => b.onclick = () => {
+    const c = clienteById(b.dataset.wa);
+    const link = CONFIG.siteUrl ? `\n\nAcesse aqui: ${CONFIG.siteUrl}` : '';
+    const msg = `Olá, ${c.nome}! Aqui está seu acesso ao portal de acompanhamento de O.S.${link}\n\nSeu PIN de acesso: ${c.pin}`;
+    const url = whatsAppLink(c.telefone, msg);
+    if(!url){ showToast('Telefone inválido.'); return; }
+    window.open(url, '_blank');
+  });
   wrap.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
     const id = b.dataset.del;
     const linkedEquip = EQUIPAMENTOS.filter(e=>e.clienteId===id).length;
@@ -762,6 +830,10 @@ function renderAdminConfig(){
         <div class="field"><label>Senha da oficina</label><input type="text" id="admin-pass-field" value="${escapeHTML(CONFIG.adminPassword)}"></div>
         <button class="btn-primary" id="save-pass-btn">Salvar senha</button>
         <div class="hint">Usada na aba "Área da oficina" da tela de login. Fica salva no Firestore (config/auth).</div>
+        <div class="field" style="margin-top:22px;"><label>Link do portal (para mensagens de WhatsApp)</label>
+          <input type="text" id="site-url-field" value="${escapeHTML(CONFIG.siteUrl)}" placeholder="https://seu-usuario.github.io/seu-repo/"></div>
+        <button class="btn-primary" id="save-url-btn">Salvar link</button>
+        <div class="hint">Usado para montar o link enviado ao cliente com o PIN e nas mensagens de atualização de status.</div>
       </div>
     </div>
   `;
@@ -771,6 +843,11 @@ function renderAdminConfig(){
     CONFIG.adminPassword = val;
     await saveConfig();
     showToast('Senha atualizada.');
+  };
+  document.getElementById('save-url-btn').onclick = async () => {
+    CONFIG.siteUrl = document.getElementById('site-url-field').value.trim();
+    await saveConfig();
+    showToast('Link salvo.');
   };
 }
 
@@ -784,6 +861,47 @@ function openModal(html){
   document.body.appendChild(overlay);
 }
 function closeModal(){ const el = document.getElementById('modal-overlay'); if(el) el.remove(); }
+
+/* ---------------- EXPORT ---------------- */
+function exportCSV(list){
+  if(!list || list.length === 0){ showToast('Nada para exportar com esse filtro.'); return; }
+  const headers = ['O.S.','Cliente','Equipamento','Patrimônio','Status','Defeito/Serviço','Entrada','Conclusão','Peças aproveitadas','Observação'];
+  const rows = list.map(o => [
+    o.id, clienteNome(o.clienteId), equipNome(o.equipamentoId), equipPatrimonio(o.equipamentoId),
+    o.status, o.defeito||'', fmtDate(o.dataEntrada), fmtDate(o.dataConclusao), o.pecas||'', o.obs||''
+  ]);
+  const escCsv = (v) => `"${String(v??'').replace(/"/g,'""')}"`;
+  const csv = [headers, ...rows].map(r => r.map(escCsv).join(';')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ordens-de-servico-${todayStr()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  showToast('CSV exportado.');
+}
+
+async function exportPDF(list){
+  if(!list || list.length === 0){ showToast('Nada para exportar com esse filtro.'); return; }
+  if(!window.jspdf){ showToast('Biblioteca de PDF ainda carregando, tente novamente em instantes.'); return; }
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation:'landscape' });
+  pdf.setFontSize(14);
+  pdf.text('Ordens de Serviço', 14, 16);
+  pdf.setFontSize(9);
+  pdf.text(`Gerado em ${fmtDate(todayStr())}`, 14, 22);
+  pdf.autoTable({
+    startY: 28,
+    head: [['O.S.','Cliente','Equipamento','Patrimônio','Status','Entrada','Conclusão','Observação']],
+    body: list.map(o => [
+      o.id, clienteNome(o.clienteId), equipNome(o.equipamentoId), equipPatrimonio(o.equipamentoId)||'—',
+      o.status, fmtDate(o.dataEntrada), fmtDate(o.dataConclusao), o.obs||''
+    ]),
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [31,56,100] },
+  });
+  pdf.save(`ordens-de-servico-${todayStr()}.pdf`);
+  showToast('PDF exportado.');
+}
 
 function confirmDelete(title, subtitle, onConfirm){
   openModal(`
