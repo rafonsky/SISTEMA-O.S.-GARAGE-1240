@@ -421,6 +421,17 @@ function renderClientDashboard(){
   document.getElementById('f-status').onchange = e => { filters.client.status = e.target.value; renderClientTable(); };
   renderClientTable();
 }
+const CLIENT_OS_COLUMNS = [
+  { key:'id', label:'O.S.', get:o=>o.id },
+  { key:'equipamento', label:'Equipamento', get:o=>equipNome(o.equipamentoId) },
+  { key:'patrimonio', label:'Patrimônio', get:o=>equipPatrimonio(o.equipamentoId) },
+  { key:'status', label:'Status', get:o=>o.status },
+  { key:'entrada', label:'Entrada', get:o=>o.dataEntrada||'' },
+  { key:'previsao', label:'Previsão', get:o=>o.previsaoEntrega||'' },
+  { key:'conclusao', label:'Conclusão', get:o=>o.dataConclusao||'' },
+];
+let clientOsSort = { key:'conclusao', dir:'desc' };
+
 function renderClientTable(){
   const wrap = document.getElementById('os-table-wrap');
   const q = (filters.client.q||'').toLowerCase();
@@ -430,12 +441,19 @@ function renderClientTable(){
     const matchesEquip = !filters.client.equip || o.equipamentoId === filters.client.equip;
     const matchesStatus = !filters.client.status || o.status === filters.client.status;
     return matchesQ && matchesEquip && matchesStatus;
-  }).sort((a,b) => (b.dataConclusao||b.dataEntrada||'').localeCompare(a.dataConclusao||a.dataEntrada||''));
+  });
+  const sortCol = CLIENT_OS_COLUMNS.find(c => c.key === clientOsSort.key) || CLIENT_OS_COLUMNS[0];
+  list = list.sort((a,b) => {
+    const cmp = String(sortCol.get(a)).localeCompare(String(sortCol.get(b)), 'pt-BR', { numeric:true });
+    return clientOsSort.dir === 'asc' ? cmp : -cmp;
+  });
 
   if(list.length === 0){ wrap.innerHTML = `<div class="empty">Nenhum resultado para esse filtro.</div>`; return; }
+  const arrow = (key) => clientOsSort.key === key ? (clientOsSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
   wrap.innerHTML = `
     <table><thead><tr>
-      <th>O.S.</th><th>Equipamento</th><th>Patrimônio</th><th>Status</th><th>Entrada</th><th>Previsão</th><th>Conclusão</th><th></th>
+      ${CLIENT_OS_COLUMNS.map(c => `<th class="sortable-th" data-sort="${c.key}">${c.label}${arrow(c.key)}</th>`).join('')}
+      <th></th>
     </tr></thead><tbody>
       ${list.map(o => `
         <tr>
@@ -451,6 +469,12 @@ function renderClientTable(){
       `).join('')}
     </tbody></table>
   `;
+  wrap.querySelectorAll('[data-sort]').forEach(th => th.onclick = () => {
+    const key = th.dataset.sort;
+    if(clientOsSort.key === key){ clientOsSort.dir = clientOsSort.dir === 'asc' ? 'desc' : 'asc'; }
+    else { clientOsSort = { key, dir: 'asc' }; }
+    renderClientTable();
+  });
   wrap.querySelectorAll('[data-view]').forEach(b => b.onclick = () => openOsDetailModal(b.dataset.view));
 }
 function openOsDetailModal(id){
@@ -570,6 +594,18 @@ function renderStatsBar(){
     renderAdminOrdens();
   });
 }
+const OS_COLUMNS = [
+  { key:'id', label:'O.S.', get:o=>o.id },
+  { key:'cliente', label:'Cliente', get:o=>clienteNome(o.clienteId) },
+  { key:'equipamento', label:'Equipamento', get:o=>equipNome(o.equipamentoId) },
+  { key:'patrimonio', label:'Patrimônio', get:o=>equipPatrimonio(o.equipamentoId) },
+  { key:'status', label:'Status', get:o=>o.status },
+  { key:'entrada', label:'Entrada', get:o=>o.dataEntrada||'' },
+  { key:'previsao', label:'Previsão', get:o=>o.previsaoEntrega||'' },
+  { key:'conclusao', label:'Conclusão', get:o=>o.dataConclusao||'' },
+];
+let osSort = { key:'id', dir:'desc' };
+
 function renderOsTable(){
   const wrap = document.getElementById('os-table-wrap');
   const q = filters.ordens.q.toLowerCase();
@@ -580,13 +616,20 @@ function renderOsTable(){
     const matchesEquip = !filters.ordens.equipamento || o.equipamentoId === filters.ordens.equipamento;
     const matchesStatus = !filters.ordens.status || o.status === filters.ordens.status;
     return matchesQ && matchesCliente && matchesEquip && matchesStatus;
-  }).sort((a,b) => b.id.localeCompare(a.id));
+  });
+  const sortCol = OS_COLUMNS.find(c => c.key === osSort.key) || OS_COLUMNS[0];
+  list = list.sort((a,b) => {
+    const cmp = String(sortCol.get(a)).localeCompare(String(sortCol.get(b)), 'pt-BR', { numeric:true });
+    return osSort.dir === 'asc' ? cmp : -cmp;
+  });
   currentOsList = list;
 
   if(list.length === 0){ wrap.innerHTML = `<div class="empty">Nenhuma O.S. encontrada.</div>`; return; }
+  const arrow = (key) => osSort.key === key ? (osSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
   wrap.innerHTML = `
     <table><thead><tr>
-      <th>O.S.</th><th>Cliente</th><th>Equipamento</th><th>Patrimônio</th><th>Status</th><th>Entrada</th><th>Previsão</th><th>Conclusão</th><th></th>
+      ${OS_COLUMNS.map(c => `<th class="sortable-th" data-sort="${c.key}">${c.label}${arrow(c.key)}</th>`).join('')}
+      <th></th>
     </tr></thead><tbody>
       ${list.map(o => `
         <tr>
@@ -609,6 +652,12 @@ function renderOsTable(){
       `).join('')}
     </tbody></table>
   `;
+  wrap.querySelectorAll('[data-sort]').forEach(th => th.onclick = () => {
+    const key = th.dataset.sort;
+    if(osSort.key === key){ osSort.dir = osSort.dir === 'asc' ? 'desc' : 'asc'; }
+    else { osSort = { key, dir: 'asc' }; }
+    renderOsTable();
+  });
   wrap.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openOsModal(b.dataset.edit));
   wrap.querySelectorAll('[data-hist]').forEach(b => b.onclick = () => openHistModal(b.dataset.hist));
   wrap.querySelectorAll('[data-print]').forEach(b => b.onclick = () => exportSingleOsPDF(ORDENS.find(x=>x.id===b.dataset.print)));
