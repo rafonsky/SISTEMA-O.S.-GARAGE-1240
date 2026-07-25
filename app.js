@@ -20,6 +20,7 @@ const STATUS_META = {
   "Concluído":                       { color:"#3FBFA8", bg:"#123b34", pulse:false },
   "Entregue ao cliente":             { color:"#5B8DEF", bg:"#182645", pulse:false },
   "Sem conserto – peças aproveitadas": { color:"#E2574C", bg:"#3a1918", pulse:false },
+  "Sem conserto – devolvido ao cliente": { color:"#94A3B8", bg:"#242c38", pulse:false },
 };
 const STATUS_LIST = Object.keys(STATUS_META);
 const TIPO_LIST = ["Notebook", "Desktop", "Periférico", "Outro"];
@@ -35,18 +36,23 @@ const CHECKLIST_ITENS = [
 
 let CONFIG = { adminPassword: 'garage1240', siteUrl: '' };
 let CLIENTES = [];     // Firestore: collection "clientes"
+let TECNICOS = [];     // Firestore: collection "tecnicos" (Rafael, Eduardo, etc.)
 let EQUIPAMENTOS = []; // Firestore: collection "equipamentos"
 let ORDENS = [];        // Firestore: collection "ordens"
 let session = { role: null, clientId: null };
 const SESSION_KEY = 'osportal_session';
+const SESSION_MAX_AGE_MS = { client: 30*24*60*60*1000, admin: 7*24*60*60*1000 }; // 30 dias cliente, 7 dias oficina
 function saveSession(){
-  try{ localStorage.setItem(SESSION_KEY, JSON.stringify(session)); }catch(e){ /* ignora se bloqueado */ }
+  try{ localStorage.setItem(SESSION_KEY, JSON.stringify({ ...session, savedAt: Date.now() })); }catch(e){ /* ignora se bloqueado */ }
 }
 function loadSession(){
   try{
     const raw = localStorage.getItem(SESSION_KEY);
     if(!raw) return { role:null, clientId:null };
-    return JSON.parse(raw);
+    const saved = JSON.parse(raw);
+    const maxAge = SESSION_MAX_AGE_MS[saved.role];
+    if(maxAge && (Date.now() - (saved.savedAt||0)) > maxAge) return { role:null, clientId:null };
+    return saved;
   }catch(e){ return { role:null, clientId:null }; }
 }
 function clearSession(){
@@ -142,6 +148,7 @@ function freshSeed(){
   const clientId = 'cli-stageav';
   CONFIG = { adminPassword: 'garage1240', siteUrl: '' };
   CLIENTES = [{ id: clientId, nome: 'Stage Audio Visual', telefone:'', email:'', documento:'', endereco:'', pin: '2026' }];
+  TECNICOS = [{ id: uid('tec'), nome: 'Rafael', senha: 'garage1240' }];
 
   const base = [
     ["Lenovo","03","2026-07-21","Concluído"],
@@ -202,6 +209,7 @@ async function loadData(){
   const clientesSnap = await getDocs(collection(db, 'clientes'));
   const equipSnap = await getDocs(collection(db, 'equipamentos'));
   const ordensSnap = await getDocs(collection(db, 'ordens'));
+  const tecnicosSnap = await getDocs(collection(db, 'tecnicos'));
 
   const totallyEmpty = !authSnap.exists() && clientesSnap.empty && ordensSnap.empty;
 
@@ -217,8 +225,16 @@ async function loadData(){
   CLIENTES = clientesSnap.docs.map(d => d.data());
   EQUIPAMENTOS = equipSnap.docs.map(d => d.data());
   ORDENS = ordensSnap.docs.map(d => d.data());
+  TECNICOS = tecnicosSnap.docs.map(d => d.data());
 
   let needsSave = false;
+
+  // --- migrate a senha única da oficina para o primeiro técnico cadastrado ---
+  if(TECNICOS.length === 0){
+    const primeiro = { id: uid('tec'), nome: 'Rafael', senha: CONFIG.adminPassword };
+    TECNICOS = [primeiro];
+    await setDoc(doc(db,'tecnicos', primeiro.id), primeiro);
+  }
 
   // --- migrate clientes embedded in config/auth (old schema) ---
   if(CLIENTES.length === 0 && Array.isArray(oldAuthData.clients) && oldAuthData.clients.length){
@@ -268,8 +284,11 @@ async function persistAll(){
   CLIENTES.forEach(c => batch.set(doc(db, 'clientes', c.id), c));
   EQUIPAMENTOS.forEach(e => batch.set(doc(db, 'equipamentos', e.id), e));
   ORDENS.forEach(o => batch.set(doc(db, 'ordens', o.id), o));
+  TECNICOS.forEach(t => batch.set(doc(db, 'tecnicos', t.id), t));
   await batch.commit();
 }
+async function saveTecnico(t){ try{ await setDoc(doc(db,'tecnicos', t.id), t); }catch(e){ showToast('Erro ao salvar técnico: '+e.message); } }
+async function deleteTecnico(id){ try{ await deleteDoc(doc(db,'tecnicos', id)); }catch(e){ showToast('Erro ao excluir: '+e.message); } }
 async function saveConfig(){ try{ await setDoc(doc(db,'config','auth'), CONFIG); }catch(e){ showToast('Erro ao salvar: '+e.message); } }
 async function saveCliente(c){ try{ await setDoc(doc(db,'clientes', c.id), c); }catch(e){ showToast('Erro ao salvar cliente: '+e.message); } }
 async function deleteCliente(id){ try{ await deleteDoc(doc(db,'clientes', id)); }catch(e){ showToast('Erro ao excluir: '+e.message); } }
@@ -337,7 +356,10 @@ function renderLoginBody(){
     document.getElementById('pin-toggle').onclick = () => togglePasswordField('pin-input', 'pin-toggle');
   } else {
     box.innerHTML = `
-      <div class="field"><label>Senha da oficina</label>
+      <div class="field"><label>Técnico</label>
+        <select id="tec-select">${TECNICOS.map(t=>`<option value="${t.id}">${escapeHTML(t.nome)}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Senha</label>
         <div class="input-with-toggle">
           <input type="password" id="pass-input" placeholder="••••••••">
           <button type="button" class="toggle-visibility" id="pass-toggle" aria-label="Mostrar senha">👁</button>
@@ -370,10 +392,12 @@ function tryClientLogin(){
   render();
 }
 function tryAdminLogin(){
+  const tecId = document.getElementById('tec-select').value;
   const pass = document.getElementById('pass-input').value;
   const err = document.getElementById('login-err');
-  if(pass !== CONFIG.adminPassword){ err.textContent = 'Senha incorreta.'; return; }
-  session = { role:'admin', clientId:null };
+  const tec = TECNICOS.find(t => t.id === tecId);
+  if(!tec || pass !== tec.senha){ err.textContent = 'Senha incorreta.'; return; }
+  session = { role:'admin', clientId:null, tecnicoId: tec.id, tecnicoNome: tec.nome };
   adminTab = 'ordens';
   saveSession();
   render();
@@ -495,7 +519,7 @@ function openOsDetailModal(id){
     ${hist.length ? `<div class="timeline" style="margin-top:14px;">
       ${hist.map(h => `<div class="timeline-item"><div class="timeline-dot"></div>
         <div class="timeline-date">${fmtDate(h.data)}</div>
-        <div class="timeline-text"><strong>${escapeHTML(h.status)}</strong>${h.texto?' — '+escapeHTML(h.texto):''}</div></div>`).join('')}
+        <div class="timeline-text"><strong>${escapeHTML(h.status)}</strong>${h.texto?' — '+escapeHTML(h.texto):''}${h.por?` <span style="color:var(--text-dim);">(${escapeHTML(h.por)})</span>`:''}</div></div>`).join('')}
     </div>` : ''}
     ${o.garantiaDias ? `<div class="os-defeito" style="margin-top:14px;"><strong>Garantia:</strong> ${escapeHTML(o.garantiaDias)} dias${o.garantiaObs ? ' — '+escapeHTML(o.garantiaObs) : ''}</div>` : ''}
     ${o.obs ? `<div class="os-defeito" style="margin-top:14px; margin-bottom:0;">${escapeHTML(o.obs)}</div>` : ''}
@@ -515,7 +539,7 @@ function renderAdminDashboard(){
   $app.innerHTML = `
     <div class="topbar">
       <div class="brand"><div class="dot"></div>
-        <div class="brand-text">PORTAL DE SERVIÇOS<small>Área da oficina</small></div>
+        <div class="brand-text">PORTAL DE SERVIÇOS<small>Área da oficina — ${escapeHTML(session.tecnicoNome||'')}</small></div>
       </div>
       <div class="topbar-right"><button class="btn-ghost" id="logout-btn">Sair</button></div>
     </div>
@@ -765,7 +789,7 @@ function renderOsModalBody(o, editing){
       let newId;
       try{ newId = await reserveNextOsId(); }
       catch(e){ showToast('Erro ao gerar número da O.S.: '+e.message); saveBtn.disabled=false; saveBtn.textContent='Criar O.S.'; return; }
-      target = { id:newId, fotoEntradaUrl:'', historico:[{data:data.dataEntrada||todayStr(), status:data.status, texto:'O.S. aberta.'}], ...data };
+      target = { id:newId, fotoEntradaUrl:'', tecnicoResponsavel: session.tecnicoNome || '', historico:[{data:data.dataEntrada||todayStr(), status:data.status, texto:'O.S. aberta.', por: session.tecnicoNome || ''}], ...data };
       ORDENS.push(target);
     }
     if(file){
@@ -806,7 +830,7 @@ function openHistModal(id){
     o.status = status;
     if(status === 'Concluído' || status === 'Entregue ao cliente'){ o.dataConclusao = data; }
     o.historico = o.historico || [];
-    o.historico.push({ data, status, texto });
+    o.historico.push({ data, status, texto, por: session.tecnicoNome || '' });
     await saveOrdem(o);
     closeModal();
     if(avisar && c && c.telefone){
@@ -1045,29 +1069,71 @@ function openClientModal(id){
 function renderAdminConfig(){
   const body = document.getElementById('admin-body');
   body.innerHTML = `
+    <div class="toolbar">
+      <div><h3 style="margin:0; font-family:var(--font-display); font-size:15px;">Técnicos</h3></div>
+      <button class="btn-small-primary" id="new-tec-btn">+ Novo técnico</button>
+    </div>
+    <table style="margin-bottom:24px;"><thead><tr><th>Nome</th><th>Senha</th><th></th></tr></thead>
+      <tbody>
+        ${TECNICOS.map(t => `
+          <tr>
+            <td data-label="Nome">${escapeHTML(t.nome)}</td>
+            <td data-label="Senha"><span class="pin-code">${escapeHTML(t.senha)}</span></td>
+            <td data-label="">
+              <button class="row-btn" data-edit-tec="${t.id}">Editar</button>
+              ${TECNICOS.length > 1 ? `<button class="row-btn row-btn-danger" data-del-tec="${t.id}">Excluir</button>` : ''}
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
     <div class="ticket" style="width:420px; max-width:100%;">
       <div class="ticket-body" style="padding-top:26px;">
-        <div class="field"><label>Senha da oficina</label><input type="text" id="admin-pass-field" value="${escapeHTML(CONFIG.adminPassword)}"></div>
-        <button class="btn-primary" id="save-pass-btn">Salvar senha</button>
-        <div class="hint">Usada na aba "Área da oficina" da tela de login. Fica salva no Firestore (config/auth).</div>
-        <div class="field" style="margin-top:22px;"><label>Link do portal (para mensagens de WhatsApp)</label>
+        <div class="field"><label>Link do portal (para mensagens de WhatsApp)</label>
           <input type="text" id="site-url-field" value="${escapeHTML(CONFIG.siteUrl)}" placeholder="https://seu-usuario.github.io/seu-repo/"></div>
         <button class="btn-primary" id="save-url-btn">Salvar link</button>
         <div class="hint">Usado para montar o link enviado ao cliente com o PIN e nas mensagens de atualização de status.</div>
       </div>
     </div>
   `;
-  document.getElementById('save-pass-btn').onclick = async () => {
-    const val = document.getElementById('admin-pass-field').value.trim();
-    if(!val){ showToast('Informe uma senha.'); return; }
-    CONFIG.adminPassword = val;
-    await saveConfig();
-    showToast('Senha atualizada.');
-  };
+  document.getElementById('new-tec-btn').onclick = () => openTecnicoModal(null);
+  body.querySelectorAll('[data-edit-tec]').forEach(b => b.onclick = () => openTecnicoModal(b.dataset.editTec));
+  body.querySelectorAll('[data-del-tec]').forEach(b => b.onclick = () => {
+    confirmDelete('Excluir este técnico?', 'Ele não vai mais conseguir entrar na área da oficina. O nome continua aparecendo no histórico de O.S. já registradas.', async () => {
+      await deleteTecnico(b.dataset.delTec);
+      TECNICOS = TECNICOS.filter(t => t.id !== b.dataset.delTec);
+      render(); showToast('Técnico excluído.');
+    });
+  });
   document.getElementById('save-url-btn').onclick = async () => {
     CONFIG.siteUrl = document.getElementById('site-url-field').value.trim();
     await saveConfig();
     showToast('Link salvo.');
+  };
+}
+
+function openTecnicoModal(id){
+  const editing = !!id;
+  const t = editing ? TECNICOS.find(x=>x.id===id) : { id: uid('tec'), nome:'', senha:'' };
+  openModal(`
+    <h3>${editing?'Editar técnico':'Novo técnico'}</h3>
+    <div class="field"><label>Nome</label><input type="text" id="tec-nome" value="${escapeHTML(t.nome)}" placeholder="Ex: Eduardo"></div>
+    <div class="field"><label>Senha</label><input type="text" id="tec-senha" value="${escapeHTML(t.senha)}" placeholder="Ex: 4821"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="tec-cancel">Cancelar</button>
+      <button class="btn-small-primary" id="tec-save">${editing?'Salvar':'Cadastrar'}</button>
+    </div>
+  `);
+  document.getElementById('tec-cancel').onclick = closeModal;
+  document.getElementById('tec-save').onclick = async () => {
+    const nome = document.getElementById('tec-nome').value.trim();
+    const senha = document.getElementById('tec-senha').value.trim();
+    if(!nome || !senha){ showToast('Preencha nome e senha.'); return; }
+    Object.assign(t, { nome, senha });
+    if(!editing) TECNICOS.push(t);
+    await saveTecnico(t);
+    closeModal(); render();
+    showToast(editing?'Técnico atualizado.':'Técnico cadastrado.');
   };
 }
 
@@ -1163,6 +1229,7 @@ function exportSingleOsPDF(o){
   line(2);
 
   label('STATUS ATUAL'); value(o.status);
+  if(o.tecnicoResponsavel) value('Técnico responsável: ' + o.tecnicoResponsavel);
   if(o.valorOrcamento) value('Valor do orçamento: ' + o.valorOrcamento);
   line(2);
 
@@ -1188,7 +1255,7 @@ function exportSingleOsPDF(o){
     label('HISTÓRICO'); line(6);
     pdf.setFontSize(9);
     hist.forEach(h => {
-      const txt = `${fmtDate(h.data)} — ${h.status}${h.texto ? ': '+h.texto : ''}`;
+      const txt = `${fmtDate(h.data)} — ${h.status}${h.texto ? ': '+h.texto : ''}${h.por ? ' ('+h.por+')' : ''}`;
       const lines = pdf.splitTextToSize(txt, right-left-4);
       pdf.text(lines, left+4, y);
       y += lines.length*4.5;
@@ -1286,7 +1353,7 @@ function confirmDelete(title, subtitle, onConfirm){
     });
     await loadData();
     const saved = loadSession();
-    if(saved.role === 'admin'){
+    if(saved.role === 'admin' && TECNICOS.find(t => t.id === saved.tecnicoId)){
       session = saved;
     } else if(saved.role === 'client' && clienteById(saved.clientId)){
       session = saved;
