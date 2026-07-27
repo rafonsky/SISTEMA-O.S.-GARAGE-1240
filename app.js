@@ -25,7 +25,8 @@ const STATUS_META = {
 const STATUS_LIST = Object.keys(STATUS_META);
 const TIPO_LIST = ["Notebook", "Desktop", "Periférico", "Outro"];
 const CHECKLIST_ITENS = [
-  "Tela/carcaça riscada ou amassada",
+  "Tela riscada ou trincada",
+  "Carcaça riscada ou amassada",
   "Sem carregador/fonte",
   "Sem cabo(s)",
   "Bateria não incluída",
@@ -106,6 +107,16 @@ function equipById(id){ return EQUIPAMENTOS.find(e=>e.id===id) || null; }
 function clienteNome(id){ const c = clienteById(id); return c ? c.nome : '—'; }
 function equipNome(id){ const e = equipById(id); return e ? e.nome : '—'; }
 function equipPatrimonio(id){ const e = equipById(id); return e ? e.patrimonio : ''; }
+function equipSpecsLine(e){
+  if(!e) return '';
+  const parts = [];
+  if(e.cpu) parts.push('CPU: '+e.cpu);
+  if(e.ram) parts.push('RAM: '+e.ram);
+  if(e.armazenamento) parts.push('Armaz.: '+e.armazenamento);
+  if(e.gpu) parts.push('GPU: '+e.gpu);
+  if(e.tela) parts.push('Tela: '+e.tela);
+  return parts.join(' · ');
+}
 function uniqueSorted(arr){ return [...new Set(arr.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')); }
 function equipLabel(id){
   const e = equipById(id);
@@ -503,6 +514,7 @@ function renderClientTable(){
 }
 function openOsDetailModal(id){
   const o = ORDENS.find(x=>x.id===id);
+  const eq = equipById(o.equipamentoId);
   const hist = (o.historico||[]).slice().sort((a,b)=>(a.data||'').localeCompare(b.data||''));
   openModal(`
     <h3>${o.id} — ${escapeHTML(equipNome(o.equipamentoId))}</h3>
@@ -510,6 +522,7 @@ function openOsDetailModal(id){
       ${equipPatrimonio(o.equipamentoId) ? `Patrimônio <span>${escapeHTML(equipPatrimonio(o.equipamentoId))}</span> · ` : ''}
       Entrada <span>${fmtDate(o.dataEntrada)}</span>${o.previsaoEntrega ? ` · Previsão <span>${fmtDate(o.previsaoEntrega)}</span>`:''}${o.dataConclusao ? ` · Conclusão <span>${fmtDate(o.dataConclusao)}</span>`:''}
     </div>
+    ${equipSpecsLine(eq) ? `<div class="os-meta" style="margin-bottom:14px;">${escapeHTML(equipSpecsLine(eq))}</div>` : ''}
     ${statusPill(o.status)}
     ${o.valorOrcamento ? `<div class="os-meta" style="margin-top:10px;">Orçamento <span>${escapeHTML(o.valorOrcamento)}</span></div>` : ''}
     ${o.defeitoRelatado ? `<div class="os-defeito" style="margin-top:14px;"><strong>Defeito relatado:</strong> ${escapeHTML(o.defeitoRelatado)}</div>` : ''}
@@ -883,7 +896,7 @@ function renderEquipTable(){
     </tr></thead><tbody>
       ${list.map(e => `
         <tr>
-          <td data-label="Equipamento">${escapeHTML(e.nome)}</td>
+          <td data-label="Equipamento">${escapeHTML(e.nome)}${equipSpecsLine(e) ? `<br><span style="font-size:11px; color:var(--text-dim);">${escapeHTML(equipSpecsLine(e))}</span>` : ''}</td>
           <td data-label="Tipo">${escapeHTML(e.tipo||'—')}</td>
           <td data-label="Cliente">${escapeHTML(clienteNome(e.clienteId))}</td>
           <td data-label="Patrimônio">${escapeHTML(e.patrimonio)||'—'}</td>
@@ -916,7 +929,7 @@ function renderEquipTable(){
 }
 function openEquipModal(id, presetClienteId, onSaved){
   const editing = !!id;
-  const e = editing ? equipById(id) : { id: uid('eq'), clienteId: presetClienteId || (CLIENTES[0]?.id||''), nome:'', tipo:'Notebook', patrimonio:'', marca:'', modelo:'', obs:'' };
+  const e = editing ? equipById(id) : { id: uid('eq'), clienteId: presetClienteId || (CLIENTES[0]?.id||''), nome:'', tipo:'Notebook', patrimonio:'', marca:'', modelo:'', cpu:'', ram:'', armazenamento:'', gpu:'', tela:'', obs:'' };
   openModal(`
     <h3>${editing?'Editar equipamento':'Novo equipamento'}</h3>
     <div class="field"><label>Cliente</label>
@@ -926,6 +939,11 @@ function openEquipModal(id, presetClienteId, onSaved){
     <div class="field"><label>Nº Patrimônio / identificação</label><input type="text" id="eq-pat" value="${escapeHTML(e.patrimonio)}" placeholder="Ex: 03 ou CINZA"></div>
     <div class="field"><label>Marca</label><input type="text" id="eq-marca" value="${escapeHTML(e.marca)}"></div>
     <div class="field"><label>Modelo</label><input type="text" id="eq-modelo" value="${escapeHTML(e.modelo)}"></div>
+    <div class="field"><label>Processador (CPU)</label><input type="text" id="eq-cpu" value="${escapeHTML(e.cpu)}" placeholder="Ex: Intel i7-13650HX"></div>
+    <div class="field"><label>Memória RAM</label><input type="text" id="eq-ram" value="${escapeHTML(e.ram)}" placeholder="Ex: 16GB"></div>
+    <div class="field"><label>Armazenamento</label><input type="text" id="eq-armaz" value="${escapeHTML(e.armazenamento)}" placeholder="Ex: SSD 512GB"></div>
+    <div class="field"><label>Placa de vídeo (GPU)</label><input type="text" id="eq-gpu" value="${escapeHTML(e.gpu)}" placeholder="Ex: RTX 4060"></div>
+    <div class="field"><label>Tela</label><input type="text" id="eq-tela" value="${escapeHTML(e.tela)}" placeholder="Ex: 15.6&quot; Full HD (deixe em branco se não se aplica)"></div>
     <div class="field"><label>Observação</label><textarea id="eq-obs">${escapeHTML(e.obs)}</textarea></div>
     <div class="modal-actions">
       <button class="btn-secondary" id="eq-cancel">Cancelar</button>
@@ -942,6 +960,11 @@ function openEquipModal(id, presetClienteId, onSaved){
       patrimonio: document.getElementById('eq-pat').value.trim(),
       marca: document.getElementById('eq-marca').value.trim(),
       modelo: document.getElementById('eq-modelo').value.trim(),
+      cpu: document.getElementById('eq-cpu').value.trim(),
+      ram: document.getElementById('eq-ram').value.trim(),
+      armazenamento: document.getElementById('eq-armaz').value.trim(),
+      gpu: document.getElementById('eq-gpu').value.trim(),
+      tela: document.getElementById('eq-tela').value.trim(),
       obs: document.getElementById('eq-obs').value.trim(),
     });
     if(!editing) EQUIPAMENTOS.push(e);
@@ -1226,6 +1249,7 @@ function exportSingleOsPDF(o){
 
   label('EQUIPAMENTO'); value(`${e?e.nome:equipNome(o.equipamentoId)}${e&&e.patrimonio?' — Patrimônio: '+e.patrimonio:''}`);
   if(e && (e.marca || e.modelo)) value('Marca/Modelo: ' + [e.marca,e.modelo].filter(Boolean).join(' / '));
+  if(e && equipSpecsLine(e)) value(equipSpecsLine(e));
   line(2);
 
   label('STATUS ATUAL'); value(o.status);
