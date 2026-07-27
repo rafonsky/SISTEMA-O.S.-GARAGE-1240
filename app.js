@@ -1323,9 +1323,9 @@ async function exportPDF(list){
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation:'landscape' });
   const logoDataUrl = await loadLogoDataUrl();
-  const textLeft = logoDataUrl ? 32 : 14;
+  const textLeft = logoDataUrl ? 58 : 14;
   if(logoDataUrl){
-    try{ pdf.addImage(logoDataUrl, 'PNG', 14, 6, 15, 17); }catch(e){ /* segue sem logo */ }
+    try{ pdf.addImage(logoDataUrl, 'PNG', 14, 8, 40, 10.9); }catch(e){ /* segue sem logo */ }
   }
   pdf.setFontSize(14);
   pdf.text('Ordens de Serviço', textLeft, 16);
@@ -1382,18 +1382,18 @@ async function exportSingleOsPDF(o){
   };
 
   const logoDataUrl = await loadLogoDataUrl();
-  const textLeft = logoDataUrl ? left + 24 : left;
   if(logoDataUrl){
-    try{ pdf.addImage(logoDataUrl, 'PNG', left, 8, 20, 22.6); }catch(e){ /* segue sem logo */ }
+    const logoW = 62, logoH = 17;
+    try{ pdf.addImage(logoDataUrl, 'PNG', 105-logoW/2, y-10, logoW, logoH); y += logoH - 6; }catch(e){ /* segue sem logo */ }
   }
 
   pdf.setFontSize(16); pdf.setFont(undefined,'bold');
-  pdf.text('ORDEM DE SERVIÇO', textLeft, y);
+  pdf.text('ORDEM DE SERVIÇO', left, y);
   pdf.setFontSize(11); pdf.setFont(undefined,'normal');
   pdf.text(o.id, right, y, { align:'right' });
   line(6);
   pdf.setFontSize(9); pdf.setTextColor(110);
-  pdf.text('Rafael / Eduardo — (41) 9131-2064 — garage1240.oficial@gmail.com', textLeft, y);
+  pdf.text('Rafael / Eduardo — (41) 9131-2064 — garage1240.oficial@gmail.com', left, y);
   pdf.setTextColor(0);
   line(10);
   pdf.setDrawColor(200); pdf.line(left, y, right, y); line(8);
@@ -1472,7 +1472,8 @@ async function exportRecibo(o){
 
   const logoDataUrl = await loadLogoDataUrl();
   if(logoDataUrl){
-    try{ pdf.addImage(logoDataUrl, 'PNG', 95, y-14, 20, 22.6); y += 18; }catch(e){ /* segue sem logo */ }
+    const logoW = 62, logoH = 17;
+    try{ pdf.addImage(logoDataUrl, 'PNG', 105-logoW/2, y-12, logoW, logoH); y += logoH - 4; }catch(e){ /* segue sem logo */ }
   }
 
   pdf.setFontSize(16); pdf.setFont(undefined,'bold');
