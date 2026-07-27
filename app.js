@@ -732,7 +732,10 @@ function renderOsModalBody(o, editing){
         <option value="">— Selecione —</option>
         ${equipDoCliente.map(e=>`<option value="${e.id}" ${e.id===o.equipamentoId?'selected':''}>${escapeHTML(e.nome)}${e.patrimonio?' ('+escapeHTML(e.patrimonio)+')':''}</option>`).join('')}
       </select>
-      <div style="margin-top:6px;"><button type="button" class="row-btn" id="m-new-equip">+ Cadastrar novo equipamento</button></div>
+      <div style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;">
+        ${o.equipamentoId ? `<button type="button" class="row-btn" id="m-edit-equip">Editar equipamento selecionado</button>` : ''}
+        <button type="button" class="row-btn" id="m-new-equip">+ Cadastrar novo equipamento</button>
+      </div>
     </div>
     <div class="field"><label>Checklist de estado na entrada</label>
       <div class="checklist-box">
@@ -767,10 +770,17 @@ function renderOsModalBody(o, editing){
     </div>
   `);
   document.getElementById('m-cliente').onchange = (e) => { o.clienteId = e.target.value; o.equipamentoId=''; closeModal(); renderOsModalBody(o, editing); };
+  document.getElementById('m-equip').onchange = (e) => { o.equipamentoId = e.target.value; closeModal(); renderOsModalBody(o, editing); };
   document.getElementById('m-new-equip').onclick = () => {
     if(!o.clienteId){ showToast('Escolha um cliente primeiro.'); return; }
     openEquipModal(null, o.clienteId, (novo) => { o.equipamentoId = novo.id; closeModal(); renderOsModalBody(o, editing); });
   };
+  const editEquipBtn = document.getElementById('m-edit-equip');
+  if(editEquipBtn){
+    editEquipBtn.onclick = () => {
+      openEquipModal(o.equipamentoId, null, () => { closeModal(); renderOsModalBody(o, editing); });
+    };
+  }
   document.getElementById('m-cancel').onclick = closeModal;
   document.getElementById('m-save').onclick = async () => {
     const saveBtn = document.getElementById('m-save');
@@ -951,12 +961,19 @@ function openEquipModal(id, presetClienteId, onSaved){
     </div>
   `);
   document.getElementById('eq-cancel').onclick = closeModal;
-  document.getElementById('eq-save').onclick = async () => {
-    const nome = document.getElementById('eq-nome').value.trim();
-    if(!nome){ showToast('Informe o nome do equipamento.'); return; }
-    Object.assign(e, {
+  const doSaveEquip = async (data) => {
+    Object.assign(e, data);
+    if(!editing) EQUIPAMENTOS.push(e);
+    await saveEquip(e);
+    closeModal();
+    if(onSaved){ onSaved(e); } else { render(); }
+    showToast(editing?'Equipamento atualizado.':'Equipamento cadastrado.');
+  };
+  document.getElementById('eq-save').onclick = () => {
+    const data = {
       clienteId: document.getElementById('eq-cliente').value,
-      nome, tipo: document.getElementById('eq-tipo').value,
+      nome: document.getElementById('eq-nome').value.trim(),
+      tipo: document.getElementById('eq-tipo').value,
       patrimonio: document.getElementById('eq-pat').value.trim(),
       marca: document.getElementById('eq-marca').value.trim(),
       modelo: document.getElementById('eq-modelo').value.trim(),
@@ -966,12 +983,31 @@ function openEquipModal(id, presetClienteId, onSaved){
       gpu: document.getElementById('eq-gpu').value.trim(),
       tela: document.getElementById('eq-tela').value.trim(),
       obs: document.getElementById('eq-obs').value.trim(),
-    });
-    if(!editing) EQUIPAMENTOS.push(e);
-    await saveEquip(e);
-    closeModal();
-    if(onSaved){ onSaved(e); } else { render(); }
-    showToast(editing?'Equipamento atualizado.':'Equipamento cadastrado.');
+    };
+    if(!data.nome){ showToast('Informe o nome do equipamento.'); return; }
+    if(!editing){
+      const dup = EQUIPAMENTOS.find(x => x.clienteId === data.clienteId && x.nome.trim().toLowerCase() === data.nome.toLowerCase());
+      if(dup){
+        closeModal();
+        openModal(`
+          <h3>Já existe um equipamento com esse nome</h3>
+          <p style="color:var(--text-dim); font-size:13.5px; margin:0 0 8px 0;">
+            "${escapeHTML(dup.nome)}"${dup.patrimonio ? ' (patrimônio '+escapeHTML(dup.patrimonio)+')' : ''} já está cadastrado para ${escapeHTML(clienteNome(dup.clienteId))}.
+          </p>
+          <p style="color:var(--text-dim); font-size:13.5px; margin:0 0 18px 0;">
+            Se é o mesmo aparelho, o certo é editar o existente (evita duplicar o histórico de O.S.). Se for outra unidade física com o mesmo modelo, pode continuar e criar mesmo assim.
+          </p>
+          <div class="modal-actions">
+            <button class="btn-secondary" id="dup-create">Criar mesmo assim</button>
+            <button class="btn-small-primary" id="dup-edit">Editar o existente</button>
+          </div>
+        `);
+        document.getElementById('dup-edit').onclick = () => { closeModal(); openEquipModal(dup.id, null, onSaved); };
+        document.getElementById('dup-create').onclick = () => { closeModal(); doSaveEquip(data); };
+        return;
+      }
+    }
+    doSaveEquip(data);
   };
 }
 
@@ -1161,15 +1197,19 @@ function openTecnicoModal(id){
 }
 
 /* ---------------- MODALS ---------------- */
+let modalStack = [];
 function openModal(html){
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
-  overlay.id = 'modal-overlay';
   overlay.innerHTML = `<div class="modal">${html}</div>`;
   overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(); });
   document.body.appendChild(overlay);
+  modalStack.push(overlay);
 }
-function closeModal(){ const el = document.getElementById('modal-overlay'); if(el) el.remove(); }
+function closeModal(){
+  const overlay = modalStack.pop();
+  if(overlay) overlay.remove();
+}
 
 /* ---------------- EXPORT ---------------- */
 function exportCSV(list){
