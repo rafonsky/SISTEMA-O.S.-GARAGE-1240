@@ -16,7 +16,7 @@ const STATUS_META = {
   "Em análise":                      { color:"#38BDF8", bg:"#0f2e3d", pulse:true },
   "Aguardando aprovação":             { color:"#A78BFA", bg:"#2b2140", pulse:true },
   "Em andamento":                    { color:"#E8A33D", bg:"#3a2c10", pulse:true },
-  "Aguardando peça":                 { color:"#E8A33D", bg:"#3a2c10", pulse:false },
+  "Aguardando peça":                 { color:"#F2795C", bg:"#3a2318", pulse:false },
   "Concluído":                       { color:"#3FBFA8", bg:"#123b34", pulse:false },
   "Entregue ao cliente":             { color:"#5B8DEF", bg:"#182645", pulse:false },
   "Sem conserto – peças aproveitadas": { color:"#E2574C", bg:"#3a1918", pulse:false },
@@ -60,7 +60,7 @@ function clearSession(){
   try{ localStorage.removeItem(SESSION_KEY); }catch(e){ /* ignora */ }
 }
 let loginTab = 'cliente';
-let adminTab = 'ordens';
+let adminTab = 'resumo';
 
 let filters = {
   ordens:   { q:'', cliente:'', equipamento:'', status:'' },
@@ -70,6 +70,7 @@ let filters = {
 };
 
 const $app = document.getElementById('app');
+const EYE_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
 
 /* ---------------- HELPERS ---------------- */
 function todayStr(){ return new Date().toISOString().slice(0,10); }
@@ -326,13 +327,14 @@ function render(){
 function renderLogin(){
   $app.innerHTML = `
     <div class="topbar">
-      <div class="brand"><div class="dot"></div>
+      <div class="brand"><img src="assets/icon-nav.png" class="brand-icon" alt="Garage 1240">
         <div class="brand-text">PORTAL DE SERVIÇOS<small>Acompanhamento de equipamentos</small></div>
       </div>
     </div>
     <div class="login-wrap">
       <div class="ticket">
         <div class="ticket-head">
+          <img src="assets/logo-full.png" class="login-logo" alt="Garage 1240">
           <h1>Acompanhe sua O.S.</h1>
           <p>Consulte o histórico e status dos equipamentos que passaram ou estão com a gente.</p>
         </div>
@@ -355,7 +357,7 @@ function renderLoginBody(){
       <div class="field"><label>PIN de acesso</label>
         <div class="input-with-toggle">
           <input type="password" inputmode="numeric" id="pin-input" placeholder="•••• ••••" maxlength="10">
-          <button type="button" class="toggle-visibility" id="pin-toggle" aria-label="Mostrar PIN">👁</button>
+          <button type="button" class="toggle-visibility" id="pin-toggle" aria-label="Mostrar PIN">${EYE_ICON}</button>
         </div>
       </div>
       <button class="btn-primary" id="pin-submit">Entrar</button>
@@ -373,7 +375,7 @@ function renderLoginBody(){
       <div class="field"><label>Senha</label>
         <div class="input-with-toggle">
           <input type="password" id="pass-input" placeholder="••••••••">
-          <button type="button" class="toggle-visibility" id="pass-toggle" aria-label="Mostrar senha">👁</button>
+          <button type="button" class="toggle-visibility" id="pass-toggle" aria-label="Mostrar senha">${EYE_ICON}</button>
         </div>
       </div>
       <button class="btn-primary" id="pass-submit">Entrar</button>
@@ -409,7 +411,7 @@ function tryAdminLogin(){
   const tec = TECNICOS.find(t => t.id === tecId);
   if(!tec || pass !== tec.senha){ err.textContent = 'Senha incorreta.'; return; }
   session = { role:'admin', clientId:null, tecnicoId: tec.id, tecnicoNome: tec.nome };
-  adminTab = 'ordens';
+  adminTab = 'resumo';
   saveSession();
   render();
 }
@@ -429,7 +431,7 @@ function renderClientDashboard(){
 
   $app.innerHTML = `
     <div class="topbar">
-      <div class="brand"><div class="dot"></div>
+      <div class="brand"><img src="assets/icon-nav.png" class="brand-icon" alt="Garage 1240">
         <div class="brand-text">PORTAL DE SERVIÇOS<small>${escapeHTML(client ? client.nome : '')}</small></div>
       </div>
       <div class="topbar-right"><button class="btn-ghost" id="logout-btn">Sair</button></div>
@@ -440,6 +442,7 @@ function renderClientDashboard(){
       </div>
       <div class="filter-bar">
         <input class="search-input" id="f-q" placeholder="Buscar equipamento, patrimônio, O.S..." value="${escapeHTML(filters.client.q)}">
+        <button type="button" class="filter-toggle-btn">Filtros ▾</button>
         <select class="select" id="f-equip"><option value="">Todos os equipamentos</option>
           ${equipOpts.map(([id,label])=>`<option value="${id}" ${filters.client.equip===id?'selected':''}>${escapeHTML(label)}</option>`).join('')}
         </select>
@@ -551,7 +554,7 @@ function openOsDetailModal(id){
 function renderAdminDashboard(){
   $app.innerHTML = `
     <div class="topbar">
-      <div class="brand"><div class="dot"></div>
+      <div class="brand"><img src="assets/icon-nav.png" class="brand-icon" alt="Garage 1240">
         <div class="brand-text">PORTAL DE SERVIÇOS<small>Área da oficina — ${escapeHTML(session.tecnicoNome||'')}</small></div>
       </div>
       <div class="topbar-right"><button class="btn-ghost" id="logout-btn">Sair</button></div>
@@ -561,6 +564,7 @@ function renderAdminDashboard(){
         <div><h2>Painel administrativo</h2><p>Rafael / Eduardo — (41) 9131-2064 — garage1240.oficial@gmail.com</p></div>
       </div>
       <div class="admin-tabs">
+        <button class="admin-tab ${adminTab==='resumo'?'active':''}" id="at-resumo">Resumo</button>
         <button class="admin-tab ${adminTab==='ordens'?'active':''}" id="at-ordens">Ordens de Serviço</button>
         <button class="admin-tab ${adminTab==='equip'?'active':''}" id="at-equip">Equipamentos</button>
         <button class="admin-tab ${adminTab==='clientes'?'active':''}" id="at-clientes">Clientes</button>
@@ -570,17 +574,88 @@ function renderAdminDashboard(){
     </div>
   `;
   document.getElementById('logout-btn').onclick = logout;
+  document.getElementById('at-resumo').onclick = () => { adminTab='resumo'; render(); };
   document.getElementById('at-ordens').onclick = () => { adminTab='ordens'; render(); };
   document.getElementById('at-equip').onclick = () => { adminTab='equip'; render(); };
   document.getElementById('at-clientes').onclick = () => { adminTab='clientes'; render(); };
   document.getElementById('at-config').onclick = () => { adminTab='config'; render(); };
-  if(adminTab==='ordens') renderAdminOrdens();
+  if(adminTab==='resumo') renderAdminResumo();
+  else if(adminTab==='ordens') renderAdminOrdens();
   else if(adminTab==='equip') renderAdminEquip();
   else if(adminTab==='clientes') renderAdminClientes();
   else renderAdminConfig();
 }
 
 /* ---------------- ADMIN · ORDENS ---------------- */
+function renderAdminResumo(){
+  const body = document.getElementById('admin-body');
+  const today = todayStr();
+  const abertas = ORDENS.filter(o => !['Concluído','Entregue ao cliente','Sem conserto – peças aproveitadas','Sem conserto – devolvido ao cliente'].includes(o.status));
+  const atrasadas = abertas.filter(o => o.previsaoEntrega && o.previsaoEntrega < today)
+    .sort((a,b) => a.previsaoEntrega.localeCompare(b.previsaoEntrega));
+  const hoje = abertas.filter(o => o.previsaoEntrega === today);
+  const semPrevisao = abertas.filter(o => !o.previsaoEntrega);
+
+  const counts = STATUS_LIST.map(s => ({ status:s, n: ORDENS.filter(o=>o.status===s).length }));
+
+  const rowsHTML = (list, emptyMsg) => list.length === 0
+    ? `<div class="empty" style="padding:24px;">${emptyMsg}</div>`
+    : `<table><tbody>
+        ${list.map(o => `
+          <tr>
+            <td data-label="O.S."><span class="os-id">${o.id}</span></td>
+            <td data-label="Cliente">${escapeHTML(clienteNome(o.clienteId))}</td>
+            <td data-label="Equipamento">${escapeHTML(equipNome(o.equipamentoId))}</td>
+            <td data-label="Status">${statusPill(o.status)}</td>
+            <td data-label="Previsão">${fmtDate(o.previsaoEntrega)}</td>
+            <td data-label=""><button class="row-btn" data-goto="${o.id}">Abrir</button></td>
+          </tr>
+        `).join('')}
+      </tbody></table>`;
+
+  body.innerHTML = `
+    <div class="stats-bar">
+      <div class="stat-card active" data-goto-tab="ordens">
+        <div class="stat-n">${ORDENS.length}</div><div class="stat-label">Total de O.S.</div>
+      </div>
+      ${counts.map(c => `
+        <div class="stat-card" data-goto-tab="ordens" data-goto-status="${c.status}" style="--stat-color:${STATUS_META[c.status].color};">
+          <div class="stat-n">${c.n}</div><div class="stat-label">${c.status}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    ${atrasadas.length ? `
+      <div class="page-head" style="margin-top:6px;"><div><h2 style="font-size:16px; color:#F2795C;">Atrasadas — previsão já passou (${atrasadas.length})</h2></div></div>
+      ${rowsHTML(atrasadas, '')}
+    ` : ''}
+
+    <div class="page-head" style="margin-top:22px;"><div><h2 style="font-size:16px;">Previsão pra hoje (${hoje.length})</h2></div></div>
+    ${rowsHTML(hoje, 'Nada com previsão pra hoje.')}
+
+    ${semPrevisao.length ? `
+      <div class="page-head" style="margin-top:22px;"><div><h2 style="font-size:16px; color:var(--text-dim);">Em aberto sem previsão definida (${semPrevisao.length})</h2></div></div>
+      ${rowsHTML(semPrevisao, '')}
+    ` : ''}
+
+    <div style="margin-top:24px;">
+      <button class="btn-small-primary" id="resumo-nova-os">+ Nova O.S.</button>
+    </div>
+  `;
+  body.querySelectorAll('[data-goto-tab]').forEach(el => el.onclick = () => {
+    filters.ordens = { q:'', cliente:'', equipamento:'', status: el.dataset.gotoStatus || '' };
+    adminTab = 'ordens';
+    render();
+  });
+  body.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => {
+    adminTab = 'ordens';
+    render();
+    openOsModal(b.dataset.goto);
+  });
+  const novaBtn = document.getElementById('resumo-nova-os');
+  if(novaBtn) novaBtn.onclick = () => { adminTab='ordens'; render(); openOsModal(null); };
+}
+
 function renderAdminOrdens(){
   const body = document.getElementById('admin-body');
   const clienteOpts = CLIENTES.slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
@@ -589,6 +664,7 @@ function renderAdminOrdens(){
     <div class="stats-bar" id="stats-bar"></div>
     <div class="filter-bar">
       <input class="search-input" id="f-q" placeholder="Buscar O.S., equipamento, patrimônio..." value="${escapeHTML(filters.ordens.q)}">
+      <button type="button" class="filter-toggle-btn">Filtros ▾</button>
       <select class="select" id="f-cliente"><option value="">Todos os clientes</option>
         ${clienteOpts.map(c=>`<option value="${c.id}" ${filters.ordens.cliente===c.id?'selected':''}>${escapeHTML(c.nome)}</option>`).join('')}</select>
       <select class="select" id="f-equip"><option value="">Todos os equipamentos</option>
@@ -679,11 +755,16 @@ function renderOsTable(){
           <td data-label="Previsão">${fmtDate(o.previsaoEntrega)}</td>
           <td data-label="Conclusão">${fmtDate(o.dataConclusao)}</td>
           <td data-label="">
-            <button class="row-btn" data-edit="${o.id}">Editar</button>
-            <button class="row-btn" data-hist="${o.id}">+ Status</button>
-            <button class="row-btn" data-print="${o.id}">Imprimir</button>
-            <button class="row-btn" data-recibo="${o.id}">Recibo</button>
-            <button class="row-btn row-btn-danger" data-del="${o.id}">Excluir</button>
+            <details class="row-menu">
+              <summary>⋮</summary>
+              <div class="row-menu-items">
+                <button data-edit="${o.id}">Editar</button>
+                <button data-hist="${o.id}">+ Status</button>
+                <button data-print="${o.id}">Imprimir</button>
+                <button data-recibo="${o.id}">Recibo</button>
+                <button class="danger" data-del="${o.id}">Excluir</button>
+              </div>
+            </details>
           </td>
         </tr>
       `).join('')}
@@ -874,6 +955,7 @@ function renderAdminEquip(){
   body.innerHTML = `
     <div class="filter-bar">
       <input class="search-input" id="f-q" placeholder="Buscar equipamento, patrimônio..." value="${escapeHTML(filters.equip.q)}">
+      <button type="button" class="filter-toggle-btn">Filtros ▾</button>
       <select class="select" id="f-cliente"><option value="">Todos os clientes</option>
         ${clienteOpts.map(c=>`<option value="${c.id}" ${filters.equip.cliente===c.id?'selected':''}>${escapeHTML(c.nome)}</option>`).join('')}</select>
       <select class="select" id="f-tipo"><option value="">Todos os tipos</option>
@@ -1044,10 +1126,15 @@ function renderClientTableAdmin(){
           <td data-label="Equip.">${EQUIPAMENTOS.filter(e=>e.clienteId===c.id).length}</td>
           <td data-label="O.S.">${ORDENS.filter(o=>o.clienteId===c.id).length}</td>
           <td data-label="">
-            <button class="row-btn" data-edit="${c.id}">Editar</button>
-            ${c.telefone ? `<button class="row-btn" data-wa="${c.id}">WhatsApp</button>` : ''}
-            <button class="row-btn row-btn-danger" data-anon="${c.id}">Anonimizar (LGPD)</button>
-            <button class="row-btn row-btn-danger" data-del="${c.id}">Excluir</button>
+            <details class="row-menu">
+              <summary>⋮</summary>
+              <div class="row-menu-items">
+                <button data-edit="${c.id}">Editar</button>
+                ${c.telefone ? `<button data-wa="${c.id}">WhatsApp</button>` : ''}
+                <button class="danger" data-anon="${c.id}">Anonimizar (LGPD)</button>
+                <button class="danger" data-del="${c.id}">Excluir</button>
+              </div>
+            </details>
           </td>
         </tr>
       `).join('')}
@@ -1235,10 +1322,15 @@ async function exportPDF(list){
   if(!window.jspdf){ showToast('Biblioteca de PDF ainda carregando, tente novamente em instantes.'); return; }
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation:'landscape' });
+  const logoDataUrl = await loadLogoDataUrl();
+  const textLeft = logoDataUrl ? 32 : 14;
+  if(logoDataUrl){
+    try{ pdf.addImage(logoDataUrl, 'PNG', 14, 6, 15, 17); }catch(e){ /* segue sem logo */ }
+  }
   pdf.setFontSize(14);
-  pdf.text('Ordens de Serviço', 14, 16);
+  pdf.text('Ordens de Serviço', textLeft, 16);
   pdf.setFontSize(9);
-  pdf.text(`Gerado em ${fmtDate(todayStr())}`, 14, 22);
+  pdf.text(`Gerado em ${fmtDate(todayStr())}`, textLeft, 22);
   pdf.autoTable({
     startY: 28,
     head: [['O.S.','Cliente','Equipamento','Patrimônio','Status','Entrada','Conclusão','Observação']],
@@ -1253,15 +1345,33 @@ async function exportPDF(list){
   showToast('PDF exportado.');
 }
 
-function exportSingleOsPDF(o){
+let _logoDataUrlCache = null;
+async function loadLogoDataUrl(){
+  if(_logoDataUrlCache !== null) return _logoDataUrlCache;
+  try{
+    const res = await fetch('assets/logo-pdf.png');
+    const blob = await res.blob();
+    _logoDataUrlCache = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }catch(e){
+    _logoDataUrlCache = false; // marca que falhou, não tenta de novo
+  }
+  return _logoDataUrlCache;
+}
+
+async function exportSingleOsPDF(o){
   if(!o){ showToast('O.S. não encontrada.'); return; }
   if(!window.jspdf){ showToast('Biblioteca de PDF ainda carregando, tente novamente em instantes.'); return; }
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation:'portrait' });
   const c = clienteById(o.clienteId);
   const e = equipById(o.equipamentoId);
-  let y = 18;
   const left = 14, right = 196;
+  let y = 18;
   const line = (h=7) => { y += h; if(y > 275){ pdf.addPage(); y = 18; } };
   const label = (txt) => { pdf.setFont(undefined,'bold'); pdf.setFontSize(9); pdf.text(txt, left, y); pdf.setFont(undefined,'normal'); };
   const value = (txt, indent=0) => {
@@ -1271,13 +1381,19 @@ function exportSingleOsPDF(o){
     line(5 + lines.length*5);
   };
 
+  const logoDataUrl = await loadLogoDataUrl();
+  const textLeft = logoDataUrl ? left + 24 : left;
+  if(logoDataUrl){
+    try{ pdf.addImage(logoDataUrl, 'PNG', left, 8, 20, 22.6); }catch(e){ /* segue sem logo */ }
+  }
+
   pdf.setFontSize(16); pdf.setFont(undefined,'bold');
-  pdf.text('ORDEM DE SERVIÇO', left, y);
+  pdf.text('ORDEM DE SERVIÇO', textLeft, y);
   pdf.setFontSize(11); pdf.setFont(undefined,'normal');
   pdf.text(o.id, right, y, { align:'right' });
   line(6);
   pdf.setFontSize(9); pdf.setTextColor(110);
-  pdf.text('Rafael / Eduardo — (41) 9131-2064 — garage1240.oficial@gmail.com', left, y);
+  pdf.text('Rafael / Eduardo — (41) 9131-2064 — garage1240.oficial@gmail.com', textLeft, y);
   pdf.setTextColor(0);
   line(10);
   pdf.setDrawColor(200); pdf.line(left, y, right, y); line(8);
@@ -1344,7 +1460,7 @@ function exportSingleOsPDF(o){
   showToast('O.S. exportada em PDF.');
 }
 
-function exportRecibo(o){
+async function exportRecibo(o){
   if(!o){ showToast('O.S. não encontrada.'); return; }
   if(!window.jspdf){ showToast('Biblioteca de PDF ainda carregando, tente novamente em instantes.'); return; }
   const { jsPDF } = window.jspdf;
@@ -1353,6 +1469,11 @@ function exportRecibo(o){
   const e = equipById(o.equipamentoId);
   const left = 14, right = 196;
   let y = 20;
+
+  const logoDataUrl = await loadLogoDataUrl();
+  if(logoDataUrl){
+    try{ pdf.addImage(logoDataUrl, 'PNG', 95, y-14, 20, 22.6); y += 18; }catch(e){ /* segue sem logo */ }
+  }
 
   pdf.setFontSize(16); pdf.setFont(undefined,'bold');
   pdf.text('RECIBO DE PAGAMENTO', 105, y, { align:'center' });
@@ -1409,6 +1530,18 @@ function confirmDelete(title, subtitle, onConfirm){
 }
 
 /* ---------------- INIT ---------------- */
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.filter-toggle-btn');
+  if(btn){ btn.closest('.filter-bar')?.classList.toggle('expanded'); }
+
+  const menuBtn = e.target.closest('.row-menu-items button');
+  if(menuBtn){ menuBtn.closest('details.row-menu')?.removeAttribute('open'); }
+
+  document.querySelectorAll('details.row-menu[open]').forEach(d => {
+    if(!d.contains(e.target)) d.removeAttribute('open');
+  });
+});
+
 (async function init(){
   try{
     await new Promise((resolve, reject) => {
