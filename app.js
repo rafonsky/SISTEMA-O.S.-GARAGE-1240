@@ -327,7 +327,7 @@ function render(){
 function renderLogin(){
   $app.innerHTML = `
     <div class="topbar">
-      <div class="brand"><img src="assets/icon-nav.png" class="brand-icon" alt="Garage 1240">
+      <div class="brand"><div class="dot"></div>
         <div class="brand-text">PORTAL DE SERVIÇOS<small>Acompanhamento de equipamentos</small></div>
       </div>
     </div>
@@ -431,7 +431,7 @@ function renderClientDashboard(){
 
   $app.innerHTML = `
     <div class="topbar">
-      <div class="brand"><img src="assets/icon-nav.png" class="brand-icon" alt="Garage 1240">
+      <div class="brand"><div class="dot"></div>
         <div class="brand-text">PORTAL DE SERVIÇOS<small>${escapeHTML(client ? client.nome : '')}</small></div>
       </div>
       <div class="topbar-right"><button class="btn-ghost" id="logout-btn">Sair</button></div>
@@ -554,7 +554,7 @@ function openOsDetailModal(id){
 function renderAdminDashboard(){
   $app.innerHTML = `
     <div class="topbar">
-      <div class="brand"><img src="assets/icon-nav.png" class="brand-icon" alt="Garage 1240">
+      <div class="brand"><div class="dot"></div>
         <div class="brand-text">PORTAL DE SERVIÇOS<small>Área da oficina — ${escapeHTML(session.tecnicoNome||'')}</small></div>
       </div>
       <div class="topbar-right"><button class="btn-ghost" id="logout-btn">Sair</button></div>
