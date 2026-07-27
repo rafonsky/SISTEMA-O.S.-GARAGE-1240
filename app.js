@@ -25,15 +25,15 @@ const STATUS_META = {
 const STATUS_LIST = Object.keys(STATUS_META);
 const TIPO_LIST = ["Notebook", "Desktop", "Periférico", "Outro"];
 const CHECKLIST_ITENS = [
-  "Tela riscada ou trincada",
-  "Carcaça riscada ou amassada",
-  "Sem carregador/fonte",
-  "Sem cabo(s)",
-  "Bateria não incluída",
-  "Tecla(s) faltando ou danificada(s)",
-  "Sinal de líquido derramado",
-  "Não liga",
+  { label: "Equipamento liga?", positive: true },
+  { label: "Acompanha fonte/carregador?", positive: true },
+  { label: "Acompanha cabo de força?", positive: true },
+  { label: "Tela sem trincas ou riscos?", positive: true },
+  { label: "Teclado/touchpad funcionando?", positive: true },
+  { label: "Bateria presente?", positive: true },
+  { label: "Carcaça com riscos ou avarias visíveis?", positive: false },
 ];
+const CHECKLIST_DEFAULT = CHECKLIST_ITENS.filter(i => i.positive).map(i => i.label);
 
 let CONFIG = { adminPassword: 'garage1240', siteUrl: '' };
 let CLIENTES = [];     // Firestore: collection "clientes"
@@ -795,71 +795,150 @@ function openOsModal(id){
   const o = editing ? ORDENS.find(x=>x.id===id) : {
     id: null, clienteId: CLIENTES[0]?.id || '', equipamentoId:'',
     defeitoRelatado:'', diagnosticoTecnico:'', valorOrcamento:'',
-    checklistEntrada:[], checklistObs:'', fotoEntradaUrl:'',
+    checklistEntrada: CHECKLIST_DEFAULT.slice(), checklistObs:'', fotoEntradaUrl:'',
     status:'Em análise', dataEntrada: todayStr(), dataConclusao:'', pecas:'', obs:'', historico:[]
   };
   renderOsModalBody(o, editing);
 }
-function renderOsModalBody(o, editing){
+function renderOsModalBody(o, editing, activeTab){
+  activeTab = activeTab || 'dados';
   const equipDoCliente = EQUIPAMENTOS.filter(e => e.clienteId === o.clienteId);
   const checklist = o.checklistEntrada || [];
+  const hist = (o.historico||[]).slice().sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  const tabIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2h6l1 3h3v3l-2 1v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9L3 8V5h3z"/></svg>`;
+  const T = (key) => activeTab === key ? 'tab-panel active' : 'tab-panel';
+  const TB = (key) => activeTab === key ? 'modal-tab active' : 'modal-tab';
+
   openModal(`
-    <h3>${editing ? 'Editar ' + o.id : 'Nova Ordem de Serviço'}</h3>
-    <div class="field"><label>Cliente</label>
-      <select id="m-cliente">${CLIENTES.map(c=>`<option value="${c.id}" ${c.id===o.clienteId?'selected':''}>${escapeHTML(c.nome)}</option>`).join('')}</select>
-    </div>
-    <div class="field"><label>Equipamento</label>
-      <select id="m-equip">
-        <option value="">— Selecione —</option>
-        ${equipDoCliente.map(e=>`<option value="${e.id}" ${e.id===o.equipamentoId?'selected':''}>${escapeHTML(e.nome)}${e.patrimonio?' ('+escapeHTML(e.patrimonio)+')':''}</option>`).join('')}
-      </select>
-      <div style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;">
-        ${o.equipamentoId ? `<button type="button" class="row-btn" id="m-edit-equip">Editar equipamento selecionado</button>` : ''}
-        <button type="button" class="row-btn" id="m-new-equip">+ Cadastrar novo equipamento</button>
+    <div class="modal-head-bar">
+      <div class="modal-icon-box">${tabIcon}</div>
+      <div class="modal-head-titles">
+        <h3>${editing ? 'Editar ' + o.id : 'Nova Ordem de Serviço'}</h3>
+        <p>Cadastro e controle de diagnóstico, checklist, orçamento e garantia</p>
       </div>
+      <button type="button" class="modal-head-close" id="m-close">×</button>
     </div>
-    <div class="field"><label>Checklist de estado na entrada</label>
+    <div class="modal-tabs">
+      <button type="button" class="${TB('dados')}" data-tab="dados">Dados Gerais</button>
+      <button type="button" class="${TB('checklist')}" data-tab="checklist">Checklist Entrada</button>
+      <button type="button" class="${TB('orcamento')}" data-tab="orcamento">Orçamento &amp; Peças</button>
+      <button type="button" class="${TB('historico')}" data-tab="historico">Histórico (${hist.length})</button>
+      <button type="button" class="${TB('fotos')}" data-tab="fotos">Fotos (${o.fotoEntradaUrl?1:0})</button>
+    </div>
+
+    <div class="${T('dados')}" data-panel="dados">
+      <div class="field"><label>Cliente</label>
+        <select id="m-cliente">${CLIENTES.map(c=>`<option value="${c.id}" ${c.id===o.clienteId?'selected':''}>${escapeHTML(c.nome)}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Equipamento</label>
+        <select id="m-equip">
+          <option value="">— Selecione —</option>
+          ${equipDoCliente.map(e=>`<option value="${e.id}" ${e.id===o.equipamentoId?'selected':''}>${escapeHTML(e.nome)}${e.patrimonio?' ('+escapeHTML(e.patrimonio)+')':''}</option>`).join('')}
+        </select>
+        <div style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;">
+          ${o.equipamentoId ? `<button type="button" class="row-btn" id="m-edit-equip">Editar equipamento selecionado</button>` : ''}
+          <button type="button" class="row-btn" id="m-new-equip">+ Cadastrar novo equipamento</button>
+        </div>
+      </div>
+      <div class="row3-field-group" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+        <div class="field"><label>Status atual</label>
+          <select id="m-status">${STATUS_LIST.map(s=>`<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></div>
+        <div class="field"><label>Previsão de entrega</label><input type="date" id="m-previsao" value="${o.previsaoEntrega||''}"></div>
+        <div class="field"><label>Garantia (dias)</label><input type="number" id="m-garantia-dias" value="${o.garantiaDias||''}" placeholder="Ex: 90" min="0"></div>
+      </div>
+      <div class="row3-field-group" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="field"><label>Data de entrada</label><input type="date" id="m-entrada" value="${o.dataEntrada||''}"></div>
+        <div class="field"><label>Data de conclusão / entrega</label><input type="date" id="m-conclusao" value="${o.dataConclusao||''}"></div>
+      </div>
+      <div class="field"><label>Defeito relatado pelo cliente</label><textarea id="m-defeito" placeholder="O que o cliente disse que está acontecendo">${escapeHTML(o.defeitoRelatado)}</textarea></div>
+      <div class="field"><label>Diagnóstico técnico</label><textarea id="m-diagnostico" placeholder="O que foi encontrado/feito após análise">${escapeHTML(o.diagnosticoTecnico)}</textarea></div>
+      <div class="field"><label>Observação</label><textarea id="m-obs">${escapeHTML(o.obs)}</textarea></div>
+    </div>
+
+    <div class="${T('checklist')}" data-panel="checklist">
+      <p style="font-size:12.5px; color:var(--text-dim); margin-top:0;">Marque o estado do equipamento na entrada — vale como registro de resguardo pra ambos os lados.</p>
       <div class="checklist-box">
         ${CHECKLIST_ITENS.map((item,i) => `
-          <label class="checklist-item"><input type="checkbox" id="m-check-${i}" ${checklist.includes(item)?'checked':''}> ${escapeHTML(item)}</label>
+          <label class="checklist-item"><input type="checkbox" id="m-check-${i}" ${checklist.includes(item.label)?'checked':''}> ${escapeHTML(item.label)}</label>
         `).join('')}
       </div>
-      <input type="text" id="m-check-obs" value="${escapeHTML(o.checklistObs)}" placeholder="Outras observações sobre o estado do equipamento" style="margin-top:8px;">
+      <div class="field" style="margin-top:12px;"><label>Observações adicionais</label>
+        <textarea id="m-check-obs" placeholder="Ex: faltando parafuso da tampa inferior, adesivo no verso...">${escapeHTML(o.checklistObs)}</textarea>
+      </div>
     </div>
-    <div class="field"><label>Foto do equipamento (entrada)</label>
-      ${o.fotoEntradaUrl ? `<div style="margin-bottom:8px;"><img src="${o.fotoEntradaUrl}" style="max-width:100%; max-height:160px; border-radius:8px; border:1px solid var(--line);"></div>` : ''}
-      <input type="file" id="m-foto" accept="image/*">
-      <div class="hint" style="margin-top:4px;">${storage ? 'Opcional — ajuda a comprovar o estado do equipamento na entrada.' : 'Upload de foto indisponível (Firebase Storage não configurado).'}</div>
+
+    <div class="${T('orcamento')}" data-panel="orcamento">
+      <div class="row3-field-group" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="field"><label>Valor do orçamento</label><input type="text" id="m-valor" value="${escapeHTML(o.valorOrcamento)}" placeholder="Ex: R$ 150,00"></div>
+        <div class="field"><label>Peças aproveitadas (se houver)</label><input type="text" id="m-pecas" value="${escapeHTML(o.pecas)}"></div>
+      </div>
+      <div class="field"><label>Condições da garantia</label><textarea id="m-garantia-obs" placeholder="Ex: cobre defeito de fábrica na peça trocada, não cobre mau uso ou dano físico">${escapeHTML(o.garantiaObs)}</textarea></div>
+      <p style="font-size:11.5px; color:var(--text-dim);">A aprovação do orçamento é controlada pelo <strong style="color:var(--text);">Status atual</strong> (aba Dados Gerais) — evita ter dois lugares controlando o mesmo estado.</p>
     </div>
-    <div class="field"><label>Defeito relatado pelo cliente</label><textarea id="m-defeito" placeholder="O que o cliente disse que está acontecendo">${escapeHTML(o.defeitoRelatado)}</textarea></div>
-    <div class="field"><label>Diagnóstico técnico</label><textarea id="m-diagnostico" placeholder="O que foi encontrado/feito após análise">${escapeHTML(o.diagnosticoTecnico)}</textarea></div>
-    <div class="field"><label>Valor do orçamento</label><input type="text" id="m-valor" value="${escapeHTML(o.valorOrcamento)}" placeholder="Ex: R$ 150,00"></div>
-    <div class="field"><label>Status atual</label>
-      <select id="m-status">${STATUS_LIST.map(s=>`<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></div>
-    <div class="field"><label>Data de entrada</label><input type="date" id="m-entrada" value="${o.dataEntrada||''}"></div>
-    <div class="field"><label>Previsão de entrega</label><input type="date" id="m-previsao" value="${o.previsaoEntrega||''}">
-      <div class="hint" style="margin-top:4px;">Combine um prazo com folga — cumprir antes gera confiança, atrasar gera desconfiança.</div>
+
+    <div class="${T('historico')}" data-panel="historico">
+      ${editing ? `
+        <div class="hist-add">
+          <input type="text" id="m-nota" placeholder="Ex: peça chegou do fornecedor, iniciando reparo...">
+          <button type="button" class="btn-small-primary" id="m-add-nota">+ Adicionar</button>
+        </div>
+      ` : `<div class="empty" style="padding:20px;">Salve a O.S. primeiro pra poder adicionar notas ao histórico.</div>`}
+      <div id="hist-list">
+        ${hist.length === 0 ? '<div class="empty" style="padding:20px;">Nenhum evento registrado ainda.</div>' : hist.map(h => `
+          <div class="hist-item">
+            <span class="hist-date">${fmtDate(h.data)}</span>
+            <p class="hist-status">${escapeHTML(h.status)}</p>
+            ${h.texto ? `<p style="color:var(--text-dim);">${escapeHTML(h.texto)}</p>` : ''}
+            ${h.por ? `<p class="hist-by">Por: ${escapeHTML(h.por)}</p>` : ''}
+          </div>
+        `).join('')}
+      </div>
     </div>
-    <div class="field"><label>Data de conclusão / entrega</label><input type="date" id="m-conclusao" value="${o.dataConclusao||''}"></div>
-    <div class="field"><label>Peças aproveitadas (se houver)</label><input type="text" id="m-pecas" value="${escapeHTML(o.pecas)}"></div>
-    <div class="field"><label>Garantia (dias)</label><input type="number" id="m-garantia-dias" value="${o.garantiaDias||''}" placeholder="Ex: 90" min="0"></div>
-    <div class="field"><label>Condições da garantia</label><textarea id="m-garantia-obs" placeholder="Ex: cobre defeito de fábrica na peça trocada, não cobre mau uso ou dano físico">${escapeHTML(o.garantiaObs)}</textarea></div>
-    <div class="field"><label>Observação</label><textarea id="m-obs">${escapeHTML(o.obs)}</textarea></div>
-    <div class="modal-actions">
+
+    <div class="${T('fotos')}" data-panel="fotos">
+      ${o.fotoEntradaUrl ? `<div style="margin-bottom:12px;"><img src="${o.fotoEntradaUrl}" style="max-width:100%; max-height:220px; border-radius:8px; border:1px solid var(--line);"></div>` : `
+        <div class="foto-drop">
+          <strong>Nenhuma foto anexada</strong>
+          <span>Foto do estado do equipamento na entrada, ou de peças trocadas.</span>
+        </div>
+      `}
+      <div style="margin-top:12px;"><input type="file" id="m-foto" accept="image/*"></div>
+      <div class="hint" style="margin-top:6px;">${storage ? 'Opcional — ajuda a comprovar o estado do equipamento na entrada.' : 'Upload de foto indisponível (Firebase Storage não configurado).'}</div>
+    </div>
+
+    <div class="modal-foot-bar">
       <button class="btn-secondary" id="m-cancel">Cancelar</button>
       <button class="btn-small-primary" id="m-save">${editing?'Salvar':'Criar O.S.'}</button>
     </div>
-  `);
-  document.getElementById('m-cliente').onchange = (e) => { o.clienteId = e.target.value; o.equipamentoId=''; closeModal(); renderOsModalBody(o, editing); };
-  document.getElementById('m-equip').onchange = (e) => { o.equipamentoId = e.target.value; closeModal(); renderOsModalBody(o, editing); };
+  `, 'modal-tabbed');
+  document.querySelectorAll('.modal-tab').forEach(tab => tab.onclick = () => {
+    closeModal(); renderOsModalBody(o, editing, tab.dataset.tab);
+  });
+  document.getElementById('m-close').onclick = closeModal;
+  document.getElementById('m-cliente').onchange = (e) => { o.clienteId = e.target.value; o.equipamentoId=''; closeModal(); renderOsModalBody(o, editing, 'dados'); };
+  document.getElementById('m-equip').onchange = (e) => { o.equipamentoId = e.target.value; closeModal(); renderOsModalBody(o, editing, 'dados'); };
   document.getElementById('m-new-equip').onclick = () => {
     if(!o.clienteId){ showToast('Escolha um cliente primeiro.'); return; }
-    openEquipModal(null, o.clienteId, (novo) => { o.equipamentoId = novo.id; closeModal(); renderOsModalBody(o, editing); });
+    openEquipModal(null, o.clienteId, (novo) => { o.equipamentoId = novo.id; closeModal(); renderOsModalBody(o, editing, 'dados'); });
   };
   const editEquipBtn = document.getElementById('m-edit-equip');
   if(editEquipBtn){
     editEquipBtn.onclick = () => {
-      openEquipModal(o.equipamentoId, null, () => { closeModal(); renderOsModalBody(o, editing); });
+      openEquipModal(o.equipamentoId, null, () => { closeModal(); renderOsModalBody(o, editing, 'dados'); });
+    };
+  }
+  const addNotaBtn = document.getElementById('m-add-nota');
+  if(addNotaBtn){
+    addNotaBtn.onclick = async () => {
+      const texto = document.getElementById('m-nota').value.trim();
+      if(!texto){ showToast('Escreva uma nota primeiro.'); return; }
+      o.historico = o.historico || [];
+      o.historico.push({ data: todayStr(), status: o.status, texto, por: session.tecnicoNome || '' });
+      addNotaBtn.disabled = true;
+      await saveOrdem(o);
+      addNotaBtn.disabled = false;
+      closeModal(); renderOsModalBody(o, editing, 'historico');
+      showToast('Nota adicionada.');
     };
   }
   document.getElementById('m-cancel').onclick = closeModal;
@@ -871,7 +950,7 @@ function renderOsModalBody(o, editing){
       defeitoRelatado: document.getElementById('m-defeito').value.trim(),
       diagnosticoTecnico: document.getElementById('m-diagnostico').value.trim(),
       valorOrcamento: document.getElementById('m-valor').value.trim(),
-      checklistEntrada: CHECKLIST_ITENS.filter((_,i) => document.getElementById(`m-check-${i}`).checked),
+      checklistEntrada: CHECKLIST_ITENS.filter((_,i) => document.getElementById(`m-check-${i}`).checked).map(item=>item.label),
       checklistObs: document.getElementById('m-check-obs').value.trim(),
       status: document.getElementById('m-status').value,
       dataEntrada: document.getElementById('m-entrada').value,
@@ -1184,12 +1263,22 @@ function openClientModal(id){
     <div class="field"><label>E-mail</label><input type="text" id="c-email" value="${escapeHTML(c.email)}"></div>
     <div class="field"><label>CPF / CNPJ</label><input type="text" id="c-doc" value="${escapeHTML(c.documento)}"></div>
     <div class="field"><label>Endereço</label><input type="text" id="c-end" value="${escapeHTML(c.endereco)}"></div>
-    <div class="field"><label>PIN de acesso</label><input type="text" id="c-pin" value="${escapeHTML(c.pin)}" placeholder="Ex: 4821"></div>
+    <div class="field"><div class="field-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <label style="margin:0;">PIN de acesso</label>
+        <button type="button" class="link-btn" id="c-gen-pin" style="background:none; border:none; color:var(--amber); font-size:12px; font-weight:600; cursor:pointer; padding:0;">Gerar novo PIN</button>
+      </div>
+      <input type="text" id="c-pin" value="${escapeHTML(c.pin)}" placeholder="Ex: 4821"></div>
     <div class="modal-actions">
       <button class="btn-secondary" id="c-cancel">Cancelar</button>
       <button class="btn-small-primary" id="c-save">${editing?'Salvar':'Cadastrar cliente'}</button>
     </div>
   `);
+  document.getElementById('c-gen-pin').onclick = () => {
+    let novo;
+    do{ novo = String(Math.floor(1000 + Math.random()*9000)); }
+    while(CLIENTES.some(x => x.pin === novo && x.id !== c.id));
+    document.getElementById('c-pin').value = novo;
+  };
   document.getElementById('c-cancel').onclick = closeModal;
   document.getElementById('c-save').onclick = async () => {
     const nome = document.getElementById('c-nome').value.trim();
@@ -1285,10 +1374,10 @@ function openTecnicoModal(id){
 
 /* ---------------- MODALS ---------------- */
 let modalStack = [];
-function openModal(html){
+function openModal(html, extraClass){
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
-  overlay.innerHTML = `<div class="modal">${html}</div>`;
+  overlay.innerHTML = `<div class="modal${extraClass ? ' '+extraClass : ''}">${html}</div>`;
   overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(); });
   document.body.appendChild(overlay);
   modalStack.push(overlay);
