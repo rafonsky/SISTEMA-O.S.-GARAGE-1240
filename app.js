@@ -553,24 +553,46 @@ function openOsDetailModal(id){
 /* ---------------- ADMIN SHELL ---------------- */
 function renderAdminDashboard(){
   $app.innerHTML = `
-    <div class="topbar">
-      <div class="brand"><div class="dot"></div>
-        <div class="brand-text">PORTAL DE SERVIÇOS<small>Área da oficina — ${escapeHTML(session.tecnicoNome||'')}</small></div>
+    <div class="app-shell">
+      <div class="sidebar">
+        <div class="side-brand"><div class="dot"></div>
+          <div class="side-brand-text">PORTAL DE SERVIÇOS<small>Área da oficina</small></div>
+        </div>
+        <div class="side-nav">
+          <button class="side-item ${adminTab==='resumo'?'active':''}" id="at-resumo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Resumo
+          </button>
+          <button class="side-item ${adminTab==='ordens'?'active':''}" id="at-ordens">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2h6l1 3h3v3l-2 1v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9L3 8V5h3z"/></svg>
+            Ordens de Serviço
+          </button>
+          <button class="side-item ${adminTab==='equip'?'active':''}" id="at-equip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            Equipamentos
+          </button>
+          <button class="side-item ${adminTab==='clientes'?'active':''}" id="at-clientes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+            Clientes
+          </button>
+          <button class="side-item ${adminTab==='config'?'active':''}" id="at-config">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14 3h-4l-.4 2.5a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.3-.9c.6.5 1.3.9 2 1.2L10 21h4l.4-2.5c.7-.3 1.4-.7 2-1.2l2.3.9 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z"/></svg>
+            Configurações
+          </button>
+        </div>
+        <div class="side-foot">
+          <div class="side-tec">${escapeHTML(session.tecnicoNome||'')}</div>
+          <button class="btn-ghost" id="logout-btn" style="width:100%; margin-top:8px;">Sair</button>
+        </div>
       </div>
-      <div class="topbar-right"><button class="btn-ghost" id="logout-btn">Sair</button></div>
-    </div>
-    <div class="content">
-      <div class="page-head">
-        <div><h2>Painel administrativo</h2><p>Rafael / Eduardo — (41) 9131-2064 — garage1240.oficial@gmail.com</p></div>
+      <div class="main-area">
+        <div class="content">
+          <div class="page-head">
+            <div><h2>Painel administrativo</h2><p>Rafael / Eduardo — (41) 9131-2064 — garage1240.oficial@gmail.com</p></div>
+          </div>
+          <div id="admin-body"></div>
+        </div>
       </div>
-      <div class="admin-tabs">
-        <button class="admin-tab ${adminTab==='resumo'?'active':''}" id="at-resumo">Resumo</button>
-        <button class="admin-tab ${adminTab==='ordens'?'active':''}" id="at-ordens">Ordens de Serviço</button>
-        <button class="admin-tab ${adminTab==='equip'?'active':''}" id="at-equip">Equipamentos</button>
-        <button class="admin-tab ${adminTab==='clientes'?'active':''}" id="at-clientes">Clientes</button>
-        <button class="admin-tab ${adminTab==='config'?'active':''}" id="at-config">Configurações</button>
-      </div>
-      <div id="admin-body"></div>
     </div>
   `;
   document.getElementById('logout-btn').onclick = logout;
