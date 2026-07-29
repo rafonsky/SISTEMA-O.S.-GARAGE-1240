@@ -16,7 +16,7 @@ const STATUS_META = {
   "Em análise":                      { color:"#38BDF8", bg:"#0f2e3d", pulse:true },
   "Aguardando aprovação":             { color:"#A78BFA", bg:"#2b2140", pulse:true },
   "Em andamento":                    { color:"#E8A33D", bg:"#3a2c10", pulse:true },
-  "Aguardando peça":                 { color:"#E8A33D", bg:"#3a2c10", pulse:false },
+  "Aguardando peça":                 { color:"#F2795C", bg:"#3a2318", pulse:false },
   "Concluído":                       { color:"#3FBFA8", bg:"#123b34", pulse:false },
   "Entregue ao cliente":             { color:"#5B8DEF", bg:"#182645", pulse:false },
   "Sem conserto – peças aproveitadas": { color:"#E2574C", bg:"#3a1918", pulse:false },
@@ -25,14 +25,15 @@ const STATUS_META = {
 const STATUS_LIST = Object.keys(STATUS_META);
 const TIPO_LIST = ["Notebook", "Desktop", "Periférico", "Outro"];
 const CHECKLIST_ITENS = [
-  "Tela/carcaça riscada ou amassada",
-  "Sem carregador/fonte",
-  "Sem cabo(s)",
-  "Bateria não incluída",
-  "Tecla(s) faltando ou danificada(s)",
-  "Sinal de líquido derramado",
-  "Não liga",
+  { label: "Equipamento liga?", positive: true },
+  { label: "Acompanha fonte/carregador?", positive: true },
+  { label: "Acompanha cabo de força?", positive: true },
+  { label: "Tela sem trincas ou riscos?", positive: true },
+  { label: "Teclado/touchpad funcionando?", positive: true },
+  { label: "Bateria presente?", positive: true },
+  { label: "Carcaça com riscos ou avarias visíveis?", positive: false },
 ];
+const CHECKLIST_DEFAULT = CHECKLIST_ITENS.filter(i => i.positive).map(i => i.label);
 
 let CONFIG = { adminPassword: 'garage1240', siteUrl: '' };
 let CLIENTES = [];     // Firestore: collection "clientes"
@@ -59,7 +60,7 @@ function clearSession(){
   try{ localStorage.removeItem(SESSION_KEY); }catch(e){ /* ignora */ }
 }
 let loginTab = 'cliente';
-let adminTab = 'ordens';
+let adminTab = 'resumo';
 
 let filters = {
   ordens:   { q:'', cliente:'', equipamento:'', status:'' },
@@ -69,6 +70,7 @@ let filters = {
 };
 
 const $app = document.getElementById('app');
+const EYE_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
 
 /* ---------------- HELPERS ---------------- */
 function todayStr(){ return new Date().toISOString().slice(0,10); }
@@ -106,6 +108,16 @@ function equipById(id){ return EQUIPAMENTOS.find(e=>e.id===id) || null; }
 function clienteNome(id){ const c = clienteById(id); return c ? c.nome : '—'; }
 function equipNome(id){ const e = equipById(id); return e ? e.nome : '—'; }
 function equipPatrimonio(id){ const e = equipById(id); return e ? e.patrimonio : ''; }
+function equipSpecsLine(e){
+  if(!e) return '';
+  const parts = [];
+  if(e.cpu) parts.push('CPU: '+e.cpu);
+  if(e.ram) parts.push('RAM: '+e.ram);
+  if(e.armazenamento) parts.push('Armaz.: '+e.armazenamento);
+  if(e.gpu) parts.push('GPU: '+e.gpu);
+  if(e.tela) parts.push('Tela: '+e.tela);
+  return parts.join(' · ');
+}
 function uniqueSorted(arr){ return [...new Set(arr.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')); }
 function equipLabel(id){
   const e = equipById(id);
@@ -322,6 +334,7 @@ function renderLogin(){
     <div class="login-wrap">
       <div class="ticket">
         <div class="ticket-head">
+          <img src="assets/logo-full.png" class="login-logo" alt="Garage 1240">
           <h1>Acompanhe sua O.S.</h1>
           <p>Consulte o histórico e status dos equipamentos que passaram ou estão com a gente.</p>
         </div>
@@ -344,7 +357,7 @@ function renderLoginBody(){
       <div class="field"><label>PIN de acesso</label>
         <div class="input-with-toggle">
           <input type="password" inputmode="numeric" id="pin-input" placeholder="•••• ••••" maxlength="10">
-          <button type="button" class="toggle-visibility" id="pin-toggle" aria-label="Mostrar PIN">👁</button>
+          <button type="button" class="toggle-visibility" id="pin-toggle" aria-label="Mostrar PIN">${EYE_ICON}</button>
         </div>
       </div>
       <button class="btn-primary" id="pin-submit">Entrar</button>
@@ -362,7 +375,7 @@ function renderLoginBody(){
       <div class="field"><label>Senha</label>
         <div class="input-with-toggle">
           <input type="password" id="pass-input" placeholder="••••••••">
-          <button type="button" class="toggle-visibility" id="pass-toggle" aria-label="Mostrar senha">👁</button>
+          <button type="button" class="toggle-visibility" id="pass-toggle" aria-label="Mostrar senha">${EYE_ICON}</button>
         </div>
       </div>
       <button class="btn-primary" id="pass-submit">Entrar</button>
@@ -398,7 +411,7 @@ function tryAdminLogin(){
   const tec = TECNICOS.find(t => t.id === tecId);
   if(!tec || pass !== tec.senha){ err.textContent = 'Senha incorreta.'; return; }
   session = { role:'admin', clientId:null, tecnicoId: tec.id, tecnicoNome: tec.nome };
-  adminTab = 'ordens';
+  adminTab = 'resumo';
   saveSession();
   render();
 }
@@ -429,6 +442,7 @@ function renderClientDashboard(){
       </div>
       <div class="filter-bar">
         <input class="search-input" id="f-q" placeholder="Buscar equipamento, patrimônio, O.S..." value="${escapeHTML(filters.client.q)}">
+        <button type="button" class="filter-toggle-btn">Filtros ▾</button>
         <select class="select" id="f-equip"><option value="">Todos os equipamentos</option>
           ${equipOpts.map(([id,label])=>`<option value="${id}" ${filters.client.equip===id?'selected':''}>${escapeHTML(label)}</option>`).join('')}
         </select>
@@ -503,6 +517,7 @@ function renderClientTable(){
 }
 function openOsDetailModal(id){
   const o = ORDENS.find(x=>x.id===id);
+  const eq = equipById(o.equipamentoId);
   const hist = (o.historico||[]).slice().sort((a,b)=>(a.data||'').localeCompare(b.data||''));
   openModal(`
     <h3>${o.id} — ${escapeHTML(equipNome(o.equipamentoId))}</h3>
@@ -510,6 +525,7 @@ function openOsDetailModal(id){
       ${equipPatrimonio(o.equipamentoId) ? `Patrimônio <span>${escapeHTML(equipPatrimonio(o.equipamentoId))}</span> · ` : ''}
       Entrada <span>${fmtDate(o.dataEntrada)}</span>${o.previsaoEntrega ? ` · Previsão <span>${fmtDate(o.previsaoEntrega)}</span>`:''}${o.dataConclusao ? ` · Conclusão <span>${fmtDate(o.dataConclusao)}</span>`:''}
     </div>
+    ${equipSpecsLine(eq) ? `<div class="os-meta" style="margin-bottom:14px;">${escapeHTML(equipSpecsLine(eq))}</div>` : ''}
     ${statusPill(o.status)}
     ${o.valorOrcamento ? `<div class="os-meta" style="margin-top:10px;">Orçamento <span>${escapeHTML(o.valorOrcamento)}</span></div>` : ''}
     ${o.defeitoRelatado ? `<div class="os-defeito" style="margin-top:14px;"><strong>Defeito relatado:</strong> ${escapeHTML(o.defeitoRelatado)}</div>` : ''}
@@ -548,6 +564,7 @@ function renderAdminDashboard(){
         <div><h2>Painel administrativo</h2><p>Rafael / Eduardo — (41) 9131-2064 — garage1240.oficial@gmail.com</p></div>
       </div>
       <div class="admin-tabs">
+        <button class="admin-tab ${adminTab==='resumo'?'active':''}" id="at-resumo">Resumo</button>
         <button class="admin-tab ${adminTab==='ordens'?'active':''}" id="at-ordens">Ordens de Serviço</button>
         <button class="admin-tab ${adminTab==='equip'?'active':''}" id="at-equip">Equipamentos</button>
         <button class="admin-tab ${adminTab==='clientes'?'active':''}" id="at-clientes">Clientes</button>
@@ -557,17 +574,88 @@ function renderAdminDashboard(){
     </div>
   `;
   document.getElementById('logout-btn').onclick = logout;
+  document.getElementById('at-resumo').onclick = () => { adminTab='resumo'; render(); };
   document.getElementById('at-ordens').onclick = () => { adminTab='ordens'; render(); };
   document.getElementById('at-equip').onclick = () => { adminTab='equip'; render(); };
   document.getElementById('at-clientes').onclick = () => { adminTab='clientes'; render(); };
   document.getElementById('at-config').onclick = () => { adminTab='config'; render(); };
-  if(adminTab==='ordens') renderAdminOrdens();
+  if(adminTab==='resumo') renderAdminResumo();
+  else if(adminTab==='ordens') renderAdminOrdens();
   else if(adminTab==='equip') renderAdminEquip();
   else if(adminTab==='clientes') renderAdminClientes();
   else renderAdminConfig();
 }
 
 /* ---------------- ADMIN · ORDENS ---------------- */
+function renderAdminResumo(){
+  const body = document.getElementById('admin-body');
+  const today = todayStr();
+  const abertas = ORDENS.filter(o => !['Concluído','Entregue ao cliente','Sem conserto – peças aproveitadas','Sem conserto – devolvido ao cliente'].includes(o.status));
+  const atrasadas = abertas.filter(o => o.previsaoEntrega && o.previsaoEntrega < today)
+    .sort((a,b) => a.previsaoEntrega.localeCompare(b.previsaoEntrega));
+  const hoje = abertas.filter(o => o.previsaoEntrega === today);
+  const semPrevisao = abertas.filter(o => !o.previsaoEntrega);
+
+  const counts = STATUS_LIST.map(s => ({ status:s, n: ORDENS.filter(o=>o.status===s).length }));
+
+  const rowsHTML = (list, emptyMsg) => list.length === 0
+    ? `<div class="empty" style="padding:24px;">${emptyMsg}</div>`
+    : `<table><tbody>
+        ${list.map(o => `
+          <tr>
+            <td data-label="O.S."><span class="os-id">${o.id}</span></td>
+            <td data-label="Cliente">${escapeHTML(clienteNome(o.clienteId))}</td>
+            <td data-label="Equipamento">${escapeHTML(equipNome(o.equipamentoId))}</td>
+            <td data-label="Status">${statusPill(o.status)}</td>
+            <td data-label="Previsão">${fmtDate(o.previsaoEntrega)}</td>
+            <td data-label=""><button class="row-btn" data-goto="${o.id}">Abrir</button></td>
+          </tr>
+        `).join('')}
+      </tbody></table>`;
+
+  body.innerHTML = `
+    <div class="stats-bar">
+      <div class="stat-card active" data-goto-tab="ordens">
+        <div class="stat-n">${ORDENS.length}</div><div class="stat-label">Total de O.S.</div>
+      </div>
+      ${counts.map(c => `
+        <div class="stat-card" data-goto-tab="ordens" data-goto-status="${c.status}" style="--stat-color:${STATUS_META[c.status].color};">
+          <div class="stat-n">${c.n}</div><div class="stat-label">${c.status}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    ${atrasadas.length ? `
+      <div class="page-head" style="margin-top:6px;"><div><h2 style="font-size:16px; color:#F2795C;">Atrasadas — previsão já passou (${atrasadas.length})</h2></div></div>
+      ${rowsHTML(atrasadas, '')}
+    ` : ''}
+
+    <div class="page-head" style="margin-top:22px;"><div><h2 style="font-size:16px;">Previsão pra hoje (${hoje.length})</h2></div></div>
+    ${rowsHTML(hoje, 'Nada com previsão pra hoje.')}
+
+    ${semPrevisao.length ? `
+      <div class="page-head" style="margin-top:22px;"><div><h2 style="font-size:16px; color:var(--text-dim);">Em aberto sem previsão definida (${semPrevisao.length})</h2></div></div>
+      ${rowsHTML(semPrevisao, '')}
+    ` : ''}
+
+    <div style="margin-top:24px;">
+      <button class="btn-small-primary" id="resumo-nova-os">+ Nova O.S.</button>
+    </div>
+  `;
+  body.querySelectorAll('[data-goto-tab]').forEach(el => el.onclick = () => {
+    filters.ordens = { q:'', cliente:'', equipamento:'', status: el.dataset.gotoStatus || '' };
+    adminTab = 'ordens';
+    render();
+  });
+  body.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => {
+    adminTab = 'ordens';
+    render();
+    openOsModal(b.dataset.goto);
+  });
+  const novaBtn = document.getElementById('resumo-nova-os');
+  if(novaBtn) novaBtn.onclick = () => { adminTab='ordens'; render(); openOsModal(null); };
+}
+
 function renderAdminOrdens(){
   const body = document.getElementById('admin-body');
   const clienteOpts = CLIENTES.slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
@@ -576,6 +664,7 @@ function renderAdminOrdens(){
     <div class="stats-bar" id="stats-bar"></div>
     <div class="filter-bar">
       <input class="search-input" id="f-q" placeholder="Buscar O.S., equipamento, patrimônio..." value="${escapeHTML(filters.ordens.q)}">
+      <button type="button" class="filter-toggle-btn">Filtros ▾</button>
       <select class="select" id="f-cliente"><option value="">Todos os clientes</option>
         ${clienteOpts.map(c=>`<option value="${c.id}" ${filters.ordens.cliente===c.id?'selected':''}>${escapeHTML(c.nome)}</option>`).join('')}</select>
       <select class="select" id="f-equip"><option value="">Todos os equipamentos</option>
@@ -666,11 +755,16 @@ function renderOsTable(){
           <td data-label="Previsão">${fmtDate(o.previsaoEntrega)}</td>
           <td data-label="Conclusão">${fmtDate(o.dataConclusao)}</td>
           <td data-label="">
-            <button class="row-btn" data-edit="${o.id}">Editar</button>
-            <button class="row-btn" data-hist="${o.id}">+ Status</button>
-            <button class="row-btn" data-print="${o.id}">Imprimir</button>
-            <button class="row-btn" data-recibo="${o.id}">Recibo</button>
-            <button class="row-btn row-btn-danger" data-del="${o.id}">Excluir</button>
+            <details class="row-menu">
+              <summary>⋮</summary>
+              <div class="row-menu-items">
+                <button data-edit="${o.id}">Editar</button>
+                <button data-hist="${o.id}">+ Status</button>
+                <button data-print="${o.id}">Imprimir</button>
+                <button data-recibo="${o.id}">Recibo</button>
+                <button class="danger" data-del="${o.id}">Excluir</button>
+              </div>
+            </details>
           </td>
         </tr>
       `).join('')}
@@ -701,63 +795,152 @@ function openOsModal(id){
   const o = editing ? ORDENS.find(x=>x.id===id) : {
     id: null, clienteId: CLIENTES[0]?.id || '', equipamentoId:'',
     defeitoRelatado:'', diagnosticoTecnico:'', valorOrcamento:'',
-    checklistEntrada:[], checklistObs:'', fotoEntradaUrl:'',
+    checklistEntrada: CHECKLIST_DEFAULT.slice(), checklistObs:'', fotoEntradaUrl:'',
     status:'Em análise', dataEntrada: todayStr(), dataConclusao:'', pecas:'', obs:'', historico:[]
   };
   renderOsModalBody(o, editing);
 }
-function renderOsModalBody(o, editing){
+function renderOsModalBody(o, editing, activeTab){
+  activeTab = activeTab || 'dados';
   const equipDoCliente = EQUIPAMENTOS.filter(e => e.clienteId === o.clienteId);
   const checklist = o.checklistEntrada || [];
+  const hist = (o.historico||[]).slice().sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  const tabIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2h6l1 3h3v3l-2 1v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9L3 8V5h3z"/></svg>`;
+  const T = (key) => activeTab === key ? 'tab-panel active' : 'tab-panel';
+  const TB = (key) => activeTab === key ? 'modal-tab active' : 'modal-tab';
+
   openModal(`
-    <h3>${editing ? 'Editar ' + o.id : 'Nova Ordem de Serviço'}</h3>
-    <div class="field"><label>Cliente</label>
-      <select id="m-cliente">${CLIENTES.map(c=>`<option value="${c.id}" ${c.id===o.clienteId?'selected':''}>${escapeHTML(c.nome)}</option>`).join('')}</select>
+    <div class="modal-head-bar">
+      <div class="modal-icon-box">${tabIcon}</div>
+      <div class="modal-head-titles">
+        <h3>${editing ? 'Editar ' + o.id : 'Nova Ordem de Serviço'}</h3>
+        <p>Cadastro e controle de diagnóstico, checklist, orçamento e garantia</p>
+      </div>
+      <button type="button" class="modal-head-close" id="m-close">×</button>
     </div>
-    <div class="field"><label>Equipamento</label>
-      <select id="m-equip">
-        <option value="">— Selecione —</option>
-        ${equipDoCliente.map(e=>`<option value="${e.id}" ${e.id===o.equipamentoId?'selected':''}>${escapeHTML(e.nome)}${e.patrimonio?' ('+escapeHTML(e.patrimonio)+')':''}</option>`).join('')}
-      </select>
-      <div style="margin-top:6px;"><button type="button" class="row-btn" id="m-new-equip">+ Cadastrar novo equipamento</button></div>
+    <div class="modal-tabs">
+      <button type="button" class="${TB('dados')}" data-tab="dados">Dados Gerais</button>
+      <button type="button" class="${TB('checklist')}" data-tab="checklist">Checklist Entrada</button>
+      <button type="button" class="${TB('orcamento')}" data-tab="orcamento">Orçamento &amp; Peças</button>
+      <button type="button" class="${TB('historico')}" data-tab="historico">Histórico (${hist.length})</button>
+      <button type="button" class="${TB('fotos')}" data-tab="fotos">Fotos (${o.fotoEntradaUrl?1:0})</button>
     </div>
-    <div class="field"><label>Checklist de estado na entrada</label>
+
+    <div class="${T('dados')}" data-panel="dados">
+      <div class="field"><label>Cliente</label>
+        <select id="m-cliente">${CLIENTES.map(c=>`<option value="${c.id}" ${c.id===o.clienteId?'selected':''}>${escapeHTML(c.nome)}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Equipamento</label>
+        <select id="m-equip">
+          <option value="">— Selecione —</option>
+          ${equipDoCliente.map(e=>`<option value="${e.id}" ${e.id===o.equipamentoId?'selected':''}>${escapeHTML(e.nome)}${e.patrimonio?' ('+escapeHTML(e.patrimonio)+')':''}</option>`).join('')}
+        </select>
+        <div style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;">
+          ${o.equipamentoId ? `<button type="button" class="row-btn" id="m-edit-equip">Editar equipamento selecionado</button>` : ''}
+          <button type="button" class="row-btn" id="m-new-equip">+ Cadastrar novo equipamento</button>
+        </div>
+      </div>
+      <div class="row3-field-group" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+        <div class="field"><label>Status atual</label>
+          <select id="m-status">${STATUS_LIST.map(s=>`<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></div>
+        <div class="field"><label>Previsão de entrega</label><input type="date" id="m-previsao" value="${o.previsaoEntrega||''}"></div>
+        <div class="field"><label>Garantia (dias)</label><input type="number" id="m-garantia-dias" value="${o.garantiaDias||''}" placeholder="Ex: 90" min="0"></div>
+      </div>
+      <div class="row3-field-group" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="field"><label>Data de entrada</label><input type="date" id="m-entrada" value="${o.dataEntrada||''}"></div>
+        <div class="field"><label>Data de conclusão / entrega</label><input type="date" id="m-conclusao" value="${o.dataConclusao||''}"></div>
+      </div>
+      <div class="field"><label>Defeito relatado pelo cliente</label><textarea id="m-defeito" placeholder="O que o cliente disse que está acontecendo">${escapeHTML(o.defeitoRelatado)}</textarea></div>
+      <div class="field"><label>Diagnóstico técnico</label><textarea id="m-diagnostico" placeholder="O que foi encontrado/feito após análise">${escapeHTML(o.diagnosticoTecnico)}</textarea></div>
+      <div class="field"><label>Observação</label><textarea id="m-obs">${escapeHTML(o.obs)}</textarea></div>
+    </div>
+
+    <div class="${T('checklist')}" data-panel="checklist">
+      <p style="font-size:12.5px; color:var(--text-dim); margin-top:0;">Marque o estado do equipamento na entrada — vale como registro de resguardo pra ambos os lados.</p>
       <div class="checklist-box">
         ${CHECKLIST_ITENS.map((item,i) => `
-          <label class="checklist-item"><input type="checkbox" id="m-check-${i}" ${checklist.includes(item)?'checked':''}> ${escapeHTML(item)}</label>
+          <label class="checklist-item"><input type="checkbox" id="m-check-${i}" ${checklist.includes(item.label)?'checked':''}> ${escapeHTML(item.label)}</label>
         `).join('')}
       </div>
-      <input type="text" id="m-check-obs" value="${escapeHTML(o.checklistObs)}" placeholder="Outras observações sobre o estado do equipamento" style="margin-top:8px;">
+      <div class="field" style="margin-top:12px;"><label>Observações adicionais</label>
+        <textarea id="m-check-obs" placeholder="Ex: faltando parafuso da tampa inferior, adesivo no verso...">${escapeHTML(o.checklistObs)}</textarea>
+      </div>
     </div>
-    <div class="field"><label>Foto do equipamento (entrada)</label>
-      ${o.fotoEntradaUrl ? `<div style="margin-bottom:8px;"><img src="${o.fotoEntradaUrl}" style="max-width:100%; max-height:160px; border-radius:8px; border:1px solid var(--line);"></div>` : ''}
-      <input type="file" id="m-foto" accept="image/*">
-      <div class="hint" style="margin-top:4px;">${storage ? 'Opcional — ajuda a comprovar o estado do equipamento na entrada.' : 'Upload de foto indisponível (Firebase Storage não configurado).'}</div>
+
+    <div class="${T('orcamento')}" data-panel="orcamento">
+      <div class="row3-field-group" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="field"><label>Valor do orçamento</label><input type="text" id="m-valor" value="${escapeHTML(o.valorOrcamento)}" placeholder="Ex: R$ 150,00"></div>
+        <div class="field"><label>Peças aproveitadas (se houver)</label><input type="text" id="m-pecas" value="${escapeHTML(o.pecas)}"></div>
+      </div>
+      <div class="field"><label>Condições da garantia</label><textarea id="m-garantia-obs" placeholder="Ex: cobre defeito de fábrica na peça trocada, não cobre mau uso ou dano físico">${escapeHTML(o.garantiaObs)}</textarea></div>
+      <p style="font-size:11.5px; color:var(--text-dim);">A aprovação do orçamento é controlada pelo <strong style="color:var(--text);">Status atual</strong> (aba Dados Gerais) — evita ter dois lugares controlando o mesmo estado.</p>
     </div>
-    <div class="field"><label>Defeito relatado pelo cliente</label><textarea id="m-defeito" placeholder="O que o cliente disse que está acontecendo">${escapeHTML(o.defeitoRelatado)}</textarea></div>
-    <div class="field"><label>Diagnóstico técnico</label><textarea id="m-diagnostico" placeholder="O que foi encontrado/feito após análise">${escapeHTML(o.diagnosticoTecnico)}</textarea></div>
-    <div class="field"><label>Valor do orçamento</label><input type="text" id="m-valor" value="${escapeHTML(o.valorOrcamento)}" placeholder="Ex: R$ 150,00"></div>
-    <div class="field"><label>Status atual</label>
-      <select id="m-status">${STATUS_LIST.map(s=>`<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></div>
-    <div class="field"><label>Data de entrada</label><input type="date" id="m-entrada" value="${o.dataEntrada||''}"></div>
-    <div class="field"><label>Previsão de entrega</label><input type="date" id="m-previsao" value="${o.previsaoEntrega||''}">
-      <div class="hint" style="margin-top:4px;">Combine um prazo com folga — cumprir antes gera confiança, atrasar gera desconfiança.</div>
+
+    <div class="${T('historico')}" data-panel="historico">
+      ${editing ? `
+        <div class="hist-add">
+          <input type="text" id="m-nota" placeholder="Ex: peça chegou do fornecedor, iniciando reparo...">
+          <button type="button" class="btn-small-primary" id="m-add-nota">+ Adicionar</button>
+        </div>
+      ` : `<div class="empty" style="padding:20px;">Salve a O.S. primeiro pra poder adicionar notas ao histórico.</div>`}
+      <div id="hist-list">
+        ${hist.length === 0 ? '<div class="empty" style="padding:20px;">Nenhum evento registrado ainda.</div>' : hist.map(h => `
+          <div class="hist-item">
+            <span class="hist-date">${fmtDate(h.data)}</span>
+            <p class="hist-status">${escapeHTML(h.status)}</p>
+            ${h.texto ? `<p style="color:var(--text-dim);">${escapeHTML(h.texto)}</p>` : ''}
+            ${h.por ? `<p class="hist-by">Por: ${escapeHTML(h.por)}</p>` : ''}
+          </div>
+        `).join('')}
+      </div>
     </div>
-    <div class="field"><label>Data de conclusão / entrega</label><input type="date" id="m-conclusao" value="${o.dataConclusao||''}"></div>
-    <div class="field"><label>Peças aproveitadas (se houver)</label><input type="text" id="m-pecas" value="${escapeHTML(o.pecas)}"></div>
-    <div class="field"><label>Garantia (dias)</label><input type="number" id="m-garantia-dias" value="${o.garantiaDias||''}" placeholder="Ex: 90" min="0"></div>
-    <div class="field"><label>Condições da garantia</label><textarea id="m-garantia-obs" placeholder="Ex: cobre defeito de fábrica na peça trocada, não cobre mau uso ou dano físico">${escapeHTML(o.garantiaObs)}</textarea></div>
-    <div class="field"><label>Observação</label><textarea id="m-obs">${escapeHTML(o.obs)}</textarea></div>
-    <div class="modal-actions">
+
+    <div class="${T('fotos')}" data-panel="fotos">
+      ${o.fotoEntradaUrl ? `<div style="margin-bottom:12px;"><img src="${o.fotoEntradaUrl}" style="max-width:100%; max-height:220px; border-radius:8px; border:1px solid var(--line);"></div>` : `
+        <div class="foto-drop">
+          <strong>Nenhuma foto anexada</strong>
+          <span>Foto do estado do equipamento na entrada, ou de peças trocadas.</span>
+        </div>
+      `}
+      <div style="margin-top:12px;"><input type="file" id="m-foto" accept="image/*"></div>
+      <div class="hint" style="margin-top:6px;">${storage ? 'Opcional — ajuda a comprovar o estado do equipamento na entrada.' : 'Upload de foto indisponível (Firebase Storage não configurado).'}</div>
+    </div>
+
+    <div class="modal-foot-bar">
       <button class="btn-secondary" id="m-cancel">Cancelar</button>
       <button class="btn-small-primary" id="m-save">${editing?'Salvar':'Criar O.S.'}</button>
     </div>
-  `);
-  document.getElementById('m-cliente').onchange = (e) => { o.clienteId = e.target.value; o.equipamentoId=''; closeModal(); renderOsModalBody(o, editing); };
+  `, 'modal-tabbed');
+  document.querySelectorAll('.modal-tab').forEach(tab => tab.onclick = () => {
+    closeModal(); renderOsModalBody(o, editing, tab.dataset.tab);
+  });
+  document.getElementById('m-close').onclick = closeModal;
+  document.getElementById('m-cliente').onchange = (e) => { o.clienteId = e.target.value; o.equipamentoId=''; closeModal(); renderOsModalBody(o, editing, 'dados'); };
+  document.getElementById('m-equip').onchange = (e) => { o.equipamentoId = e.target.value; closeModal(); renderOsModalBody(o, editing, 'dados'); };
   document.getElementById('m-new-equip').onclick = () => {
     if(!o.clienteId){ showToast('Escolha um cliente primeiro.'); return; }
-    openEquipModal(null, o.clienteId, (novo) => { o.equipamentoId = novo.id; closeModal(); renderOsModalBody(o, editing); });
+    openEquipModal(null, o.clienteId, (novo) => { o.equipamentoId = novo.id; closeModal(); renderOsModalBody(o, editing, 'dados'); });
   };
+  const editEquipBtn = document.getElementById('m-edit-equip');
+  if(editEquipBtn){
+    editEquipBtn.onclick = () => {
+      openEquipModal(o.equipamentoId, null, () => { closeModal(); renderOsModalBody(o, editing, 'dados'); });
+    };
+  }
+  const addNotaBtn = document.getElementById('m-add-nota');
+  if(addNotaBtn){
+    addNotaBtn.onclick = async () => {
+      const texto = document.getElementById('m-nota').value.trim();
+      if(!texto){ showToast('Escreva uma nota primeiro.'); return; }
+      o.historico = o.historico || [];
+      o.historico.push({ data: todayStr(), status: o.status, texto, por: session.tecnicoNome || '' });
+      addNotaBtn.disabled = true;
+      await saveOrdem(o);
+      addNotaBtn.disabled = false;
+      closeModal(); renderOsModalBody(o, editing, 'historico');
+      showToast('Nota adicionada.');
+    };
+  }
   document.getElementById('m-cancel').onclick = closeModal;
   document.getElementById('m-save').onclick = async () => {
     const saveBtn = document.getElementById('m-save');
@@ -767,7 +950,7 @@ function renderOsModalBody(o, editing){
       defeitoRelatado: document.getElementById('m-defeito').value.trim(),
       diagnosticoTecnico: document.getElementById('m-diagnostico').value.trim(),
       valorOrcamento: document.getElementById('m-valor').value.trim(),
-      checklistEntrada: CHECKLIST_ITENS.filter((_,i) => document.getElementById(`m-check-${i}`).checked),
+      checklistEntrada: CHECKLIST_ITENS.filter((_,i) => document.getElementById(`m-check-${i}`).checked).map(item=>item.label),
       checklistObs: document.getElementById('m-check-obs').value.trim(),
       status: document.getElementById('m-status').value,
       dataEntrada: document.getElementById('m-entrada').value,
@@ -851,6 +1034,7 @@ function renderAdminEquip(){
   body.innerHTML = `
     <div class="filter-bar">
       <input class="search-input" id="f-q" placeholder="Buscar equipamento, patrimônio..." value="${escapeHTML(filters.equip.q)}">
+      <button type="button" class="filter-toggle-btn">Filtros ▾</button>
       <select class="select" id="f-cliente"><option value="">Todos os clientes</option>
         ${clienteOpts.map(c=>`<option value="${c.id}" ${filters.equip.cliente===c.id?'selected':''}>${escapeHTML(c.nome)}</option>`).join('')}</select>
       <select class="select" id="f-tipo"><option value="">Todos os tipos</option>
@@ -883,7 +1067,7 @@ function renderEquipTable(){
     </tr></thead><tbody>
       ${list.map(e => `
         <tr>
-          <td data-label="Equipamento">${escapeHTML(e.nome)}</td>
+          <td data-label="Equipamento">${escapeHTML(e.nome)}${equipSpecsLine(e) ? `<br><span style="font-size:11px; color:var(--text-dim);">${escapeHTML(equipSpecsLine(e))}</span>` : ''}</td>
           <td data-label="Tipo">${escapeHTML(e.tipo||'—')}</td>
           <td data-label="Cliente">${escapeHTML(clienteNome(e.clienteId))}</td>
           <td data-label="Patrimônio">${escapeHTML(e.patrimonio)||'—'}</td>
@@ -916,7 +1100,7 @@ function renderEquipTable(){
 }
 function openEquipModal(id, presetClienteId, onSaved){
   const editing = !!id;
-  const e = editing ? equipById(id) : { id: uid('eq'), clienteId: presetClienteId || (CLIENTES[0]?.id||''), nome:'', tipo:'Notebook', patrimonio:'', marca:'', modelo:'', obs:'' };
+  const e = editing ? equipById(id) : { id: uid('eq'), clienteId: presetClienteId || (CLIENTES[0]?.id||''), nome:'', tipo:'Notebook', patrimonio:'', marca:'', modelo:'', cpu:'', ram:'', armazenamento:'', gpu:'', tela:'', obs:'' };
   openModal(`
     <h3>${editing?'Editar equipamento':'Novo equipamento'}</h3>
     <div class="field"><label>Cliente</label>
@@ -926,6 +1110,11 @@ function openEquipModal(id, presetClienteId, onSaved){
     <div class="field"><label>Nº Patrimônio / identificação</label><input type="text" id="eq-pat" value="${escapeHTML(e.patrimonio)}" placeholder="Ex: 03 ou CINZA"></div>
     <div class="field"><label>Marca</label><input type="text" id="eq-marca" value="${escapeHTML(e.marca)}"></div>
     <div class="field"><label>Modelo</label><input type="text" id="eq-modelo" value="${escapeHTML(e.modelo)}"></div>
+    <div class="field"><label>Processador (CPU)</label><input type="text" id="eq-cpu" value="${escapeHTML(e.cpu)}" placeholder="Ex: Intel i7-13650HX"></div>
+    <div class="field"><label>Memória RAM</label><input type="text" id="eq-ram" value="${escapeHTML(e.ram)}" placeholder="Ex: 16GB"></div>
+    <div class="field"><label>Armazenamento</label><input type="text" id="eq-armaz" value="${escapeHTML(e.armazenamento)}" placeholder="Ex: SSD 512GB"></div>
+    <div class="field"><label>Placa de vídeo (GPU)</label><input type="text" id="eq-gpu" value="${escapeHTML(e.gpu)}" placeholder="Ex: RTX 4060"></div>
+    <div class="field"><label>Tela</label><input type="text" id="eq-tela" value="${escapeHTML(e.tela)}" placeholder="Ex: 15.6&quot; Full HD (deixe em branco se não se aplica)"></div>
     <div class="field"><label>Observação</label><textarea id="eq-obs">${escapeHTML(e.obs)}</textarea></div>
     <div class="modal-actions">
       <button class="btn-secondary" id="eq-cancel">Cancelar</button>
@@ -933,22 +1122,53 @@ function openEquipModal(id, presetClienteId, onSaved){
     </div>
   `);
   document.getElementById('eq-cancel').onclick = closeModal;
-  document.getElementById('eq-save').onclick = async () => {
-    const nome = document.getElementById('eq-nome').value.trim();
-    if(!nome){ showToast('Informe o nome do equipamento.'); return; }
-    Object.assign(e, {
-      clienteId: document.getElementById('eq-cliente').value,
-      nome, tipo: document.getElementById('eq-tipo').value,
-      patrimonio: document.getElementById('eq-pat').value.trim(),
-      marca: document.getElementById('eq-marca').value.trim(),
-      modelo: document.getElementById('eq-modelo').value.trim(),
-      obs: document.getElementById('eq-obs').value.trim(),
-    });
+  const doSaveEquip = async (data) => {
+    Object.assign(e, data);
     if(!editing) EQUIPAMENTOS.push(e);
     await saveEquip(e);
     closeModal();
     if(onSaved){ onSaved(e); } else { render(); }
     showToast(editing?'Equipamento atualizado.':'Equipamento cadastrado.');
+  };
+  document.getElementById('eq-save').onclick = () => {
+    const data = {
+      clienteId: document.getElementById('eq-cliente').value,
+      nome: document.getElementById('eq-nome').value.trim(),
+      tipo: document.getElementById('eq-tipo').value,
+      patrimonio: document.getElementById('eq-pat').value.trim(),
+      marca: document.getElementById('eq-marca').value.trim(),
+      modelo: document.getElementById('eq-modelo').value.trim(),
+      cpu: document.getElementById('eq-cpu').value.trim(),
+      ram: document.getElementById('eq-ram').value.trim(),
+      armazenamento: document.getElementById('eq-armaz').value.trim(),
+      gpu: document.getElementById('eq-gpu').value.trim(),
+      tela: document.getElementById('eq-tela').value.trim(),
+      obs: document.getElementById('eq-obs').value.trim(),
+    };
+    if(!data.nome){ showToast('Informe o nome do equipamento.'); return; }
+    if(!editing){
+      const dup = EQUIPAMENTOS.find(x => x.clienteId === data.clienteId && x.nome.trim().toLowerCase() === data.nome.toLowerCase());
+      if(dup){
+        closeModal();
+        openModal(`
+          <h3>Já existe um equipamento com esse nome</h3>
+          <p style="color:var(--text-dim); font-size:13.5px; margin:0 0 8px 0;">
+            "${escapeHTML(dup.nome)}"${dup.patrimonio ? ' (patrimônio '+escapeHTML(dup.patrimonio)+')' : ''} já está cadastrado para ${escapeHTML(clienteNome(dup.clienteId))}.
+          </p>
+          <p style="color:var(--text-dim); font-size:13.5px; margin:0 0 18px 0;">
+            Se é o mesmo aparelho, o certo é editar o existente (evita duplicar o histórico de O.S.). Se for outra unidade física com o mesmo modelo, pode continuar e criar mesmo assim.
+          </p>
+          <div class="modal-actions">
+            <button class="btn-secondary" id="dup-create">Criar mesmo assim</button>
+            <button class="btn-small-primary" id="dup-edit">Editar o existente</button>
+          </div>
+        `);
+        document.getElementById('dup-edit').onclick = () => { closeModal(); openEquipModal(dup.id, null, onSaved); };
+        document.getElementById('dup-create').onclick = () => { closeModal(); doSaveEquip(data); };
+        return;
+      }
+    }
+    doSaveEquip(data);
   };
 }
 
@@ -985,10 +1205,15 @@ function renderClientTableAdmin(){
           <td data-label="Equip.">${EQUIPAMENTOS.filter(e=>e.clienteId===c.id).length}</td>
           <td data-label="O.S.">${ORDENS.filter(o=>o.clienteId===c.id).length}</td>
           <td data-label="">
-            <button class="row-btn" data-edit="${c.id}">Editar</button>
-            ${c.telefone ? `<button class="row-btn" data-wa="${c.id}">WhatsApp</button>` : ''}
-            <button class="row-btn row-btn-danger" data-anon="${c.id}">Anonimizar (LGPD)</button>
-            <button class="row-btn row-btn-danger" data-del="${c.id}">Excluir</button>
+            <details class="row-menu">
+              <summary>⋮</summary>
+              <div class="row-menu-items">
+                <button data-edit="${c.id}">Editar</button>
+                ${c.telefone ? `<button data-wa="${c.id}">WhatsApp</button>` : ''}
+                <button class="danger" data-anon="${c.id}">Anonimizar (LGPD)</button>
+                <button class="danger" data-del="${c.id}">Excluir</button>
+              </div>
+            </details>
           </td>
         </tr>
       `).join('')}
@@ -1038,12 +1263,22 @@ function openClientModal(id){
     <div class="field"><label>E-mail</label><input type="text" id="c-email" value="${escapeHTML(c.email)}"></div>
     <div class="field"><label>CPF / CNPJ</label><input type="text" id="c-doc" value="${escapeHTML(c.documento)}"></div>
     <div class="field"><label>Endereço</label><input type="text" id="c-end" value="${escapeHTML(c.endereco)}"></div>
-    <div class="field"><label>PIN de acesso</label><input type="text" id="c-pin" value="${escapeHTML(c.pin)}" placeholder="Ex: 4821"></div>
+    <div class="field"><div class="field-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <label style="margin:0;">PIN de acesso</label>
+        <button type="button" class="link-btn" id="c-gen-pin" style="background:none; border:none; color:var(--amber); font-size:12px; font-weight:600; cursor:pointer; padding:0;">Gerar novo PIN</button>
+      </div>
+      <input type="text" id="c-pin" value="${escapeHTML(c.pin)}" placeholder="Ex: 4821"></div>
     <div class="modal-actions">
       <button class="btn-secondary" id="c-cancel">Cancelar</button>
       <button class="btn-small-primary" id="c-save">${editing?'Salvar':'Cadastrar cliente'}</button>
     </div>
   `);
+  document.getElementById('c-gen-pin').onclick = () => {
+    let novo;
+    do{ novo = String(Math.floor(1000 + Math.random()*9000)); }
+    while(CLIENTES.some(x => x.pin === novo && x.id !== c.id));
+    document.getElementById('c-pin').value = novo;
+  };
   document.getElementById('c-cancel').onclick = closeModal;
   document.getElementById('c-save').onclick = async () => {
     const nome = document.getElementById('c-nome').value.trim();
@@ -1138,15 +1373,19 @@ function openTecnicoModal(id){
 }
 
 /* ---------------- MODALS ---------------- */
-function openModal(html){
+let modalStack = [];
+function openModal(html, extraClass){
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
-  overlay.id = 'modal-overlay';
-  overlay.innerHTML = `<div class="modal">${html}</div>`;
+  overlay.innerHTML = `<div class="modal${extraClass ? ' '+extraClass : ''}">${html}</div>`;
   overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(); });
   document.body.appendChild(overlay);
+  modalStack.push(overlay);
 }
-function closeModal(){ const el = document.getElementById('modal-overlay'); if(el) el.remove(); }
+function closeModal(){
+  const overlay = modalStack.pop();
+  if(overlay) overlay.remove();
+}
 
 /* ---------------- EXPORT ---------------- */
 function exportCSV(list){
@@ -1172,10 +1411,15 @@ async function exportPDF(list){
   if(!window.jspdf){ showToast('Biblioteca de PDF ainda carregando, tente novamente em instantes.'); return; }
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation:'landscape' });
+  const logoDataUrl = await loadLogoDataUrl();
+  const textLeft = logoDataUrl ? 58 : 14;
+  if(logoDataUrl){
+    try{ pdf.addImage(logoDataUrl, 'PNG', 14, 8, 40, 10.9); }catch(e){ /* segue sem logo */ }
+  }
   pdf.setFontSize(14);
-  pdf.text('Ordens de Serviço', 14, 16);
+  pdf.text('Ordens de Serviço', textLeft, 16);
   pdf.setFontSize(9);
-  pdf.text(`Gerado em ${fmtDate(todayStr())}`, 14, 22);
+  pdf.text(`Gerado em ${fmtDate(todayStr())}`, textLeft, 22);
   pdf.autoTable({
     startY: 28,
     head: [['O.S.','Cliente','Equipamento','Patrimônio','Status','Entrada','Conclusão','Observação']],
@@ -1190,15 +1434,33 @@ async function exportPDF(list){
   showToast('PDF exportado.');
 }
 
-function exportSingleOsPDF(o){
+let _logoDataUrlCache = null;
+async function loadLogoDataUrl(){
+  if(_logoDataUrlCache !== null) return _logoDataUrlCache;
+  try{
+    const res = await fetch('assets/logo-pdf.png');
+    const blob = await res.blob();
+    _logoDataUrlCache = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }catch(e){
+    _logoDataUrlCache = false; // marca que falhou, não tenta de novo
+  }
+  return _logoDataUrlCache;
+}
+
+async function exportSingleOsPDF(o){
   if(!o){ showToast('O.S. não encontrada.'); return; }
   if(!window.jspdf){ showToast('Biblioteca de PDF ainda carregando, tente novamente em instantes.'); return; }
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation:'portrait' });
   const c = clienteById(o.clienteId);
   const e = equipById(o.equipamentoId);
-  let y = 18;
   const left = 14, right = 196;
+  let y = 18;
   const line = (h=7) => { y += h; if(y > 275){ pdf.addPage(); y = 18; } };
   const label = (txt) => { pdf.setFont(undefined,'bold'); pdf.setFontSize(9); pdf.text(txt, left, y); pdf.setFont(undefined,'normal'); };
   const value = (txt, indent=0) => {
@@ -1207,6 +1469,12 @@ function exportSingleOsPDF(o){
     pdf.text(lines, left+indent, y+5);
     line(5 + lines.length*5);
   };
+
+  const logoDataUrl = await loadLogoDataUrl();
+  if(logoDataUrl){
+    const logoW = 62, logoH = 17;
+    try{ pdf.addImage(logoDataUrl, 'PNG', 105-logoW/2, y-10, logoW, logoH); y += logoH - 6; }catch(e){ /* segue sem logo */ }
+  }
 
   pdf.setFontSize(16); pdf.setFont(undefined,'bold');
   pdf.text('ORDEM DE SERVIÇO', left, y);
@@ -1226,6 +1494,7 @@ function exportSingleOsPDF(o){
 
   label('EQUIPAMENTO'); value(`${e?e.nome:equipNome(o.equipamentoId)}${e&&e.patrimonio?' — Patrimônio: '+e.patrimonio:''}`);
   if(e && (e.marca || e.modelo)) value('Marca/Modelo: ' + [e.marca,e.modelo].filter(Boolean).join(' / '));
+  if(e && equipSpecsLine(e)) value(equipSpecsLine(e));
   line(2);
 
   label('STATUS ATUAL'); value(o.status);
@@ -1280,7 +1549,7 @@ function exportSingleOsPDF(o){
   showToast('O.S. exportada em PDF.');
 }
 
-function exportRecibo(o){
+async function exportRecibo(o){
   if(!o){ showToast('O.S. não encontrada.'); return; }
   if(!window.jspdf){ showToast('Biblioteca de PDF ainda carregando, tente novamente em instantes.'); return; }
   const { jsPDF } = window.jspdf;
@@ -1289,6 +1558,12 @@ function exportRecibo(o){
   const e = equipById(o.equipamentoId);
   const left = 14, right = 196;
   let y = 20;
+
+  const logoDataUrl = await loadLogoDataUrl();
+  if(logoDataUrl){
+    const logoW = 62, logoH = 17;
+    try{ pdf.addImage(logoDataUrl, 'PNG', 105-logoW/2, y-12, logoW, logoH); y += logoH - 4; }catch(e){ /* segue sem logo */ }
+  }
 
   pdf.setFontSize(16); pdf.setFont(undefined,'bold');
   pdf.text('RECIBO DE PAGAMENTO', 105, y, { align:'center' });
@@ -1345,6 +1620,18 @@ function confirmDelete(title, subtitle, onConfirm){
 }
 
 /* ---------------- INIT ---------------- */
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.filter-toggle-btn');
+  if(btn){ btn.closest('.filter-bar')?.classList.toggle('expanded'); }
+
+  const menuBtn = e.target.closest('.row-menu-items button');
+  if(menuBtn){ menuBtn.closest('details.row-menu')?.removeAttribute('open'); }
+
+  document.querySelectorAll('details.row-menu[open]').forEach(d => {
+    if(!d.contains(e.target)) d.removeAttribute('open');
+  });
+});
+
 (async function init(){
   try{
     await new Promise((resolve, reject) => {
