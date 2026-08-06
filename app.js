@@ -79,9 +79,29 @@ let filters = {
 let equipView = 'completa'; // 'completa' | 'simples'
 let selectedEquipIds = new Set();
 let currentEquipList = []; // last rendered/filtered equipment list
+let theme = localStorage.getItem('g1240-theme') || 'dark'; // 'dark' | 'light'
 
 const $app = document.getElementById('app');
 const EYE_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const SUN_ICON = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`;
+const MOON_ICON = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>`;
+function applyTheme(){ document.documentElement.setAttribute('data-theme', theme); }
+function toggleTheme(){
+  theme = theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('g1240-theme', theme);
+  applyTheme();
+  render();
+}
+/* Botão de alternância de tema — 'icon' para topbars (só o ícone) e 'block' para o rodapé da sidebar (com rótulo) */
+function themeToggleButton(variant){
+  const icon = theme === 'dark' ? SUN_ICON : MOON_ICON;
+  const label = theme === 'dark' ? 'Tema claro' : 'Tema escuro';
+  if(variant === 'block'){
+    return `<button class="btn-ghost theme-toggle-btn" id="theme-toggle-btn" style="width:100%; margin-top:8px; display:flex; align-items:center; justify-content:center; gap:7px;">${icon}${label}</button>`;
+  }
+  return `<button class="btn-ghost theme-toggle-icon" id="theme-toggle-btn" aria-label="${label}" title="${label}">${icon}</button>`;
+}
+applyTheme();
 
 /* ---------------- HELPERS ---------------- */
 function todayStr(){ return new Date().toISOString().slice(0,10); }
@@ -342,6 +362,7 @@ function renderLogin(){
       <div class="brand"><div class="dot"></div>
         <div class="brand-text">PORTAL DE SERVIÇOS<small>Acompanhamento de equipamentos</small></div>
       </div>
+      <div class="topbar-right">${themeToggleButton('icon')}</div>
     </div>
     <div class="login-wrap">
       <div class="ticket">
@@ -360,6 +381,7 @@ function renderLogin(){
   `;
   document.getElementById('tab-cliente').onclick = () => { loginTab='cliente'; render(); };
   document.getElementById('tab-oficina').onclick = () => { loginTab='oficina'; render(); };
+  document.getElementById('theme-toggle-btn').onclick = toggleTheme;
   renderLoginBody();
 }
 function renderLoginBody(){
@@ -466,7 +488,7 @@ function renderClientDashboard(){
       <div class="brand"><div class="dot"></div>
         <div class="brand-text">PORTAL DE SERVIÇOS<small>${escapeHTML(client ? client.nome : '')}</small></div>
       </div>
-      <div class="topbar-right"><button class="btn-ghost" id="logout-btn">Sair</button></div>
+      <div class="topbar-right">${themeToggleButton('icon')}<button class="btn-ghost" id="logout-btn">Sair</button></div>
     </div>
     <div class="content">
       <div class="page-head">
@@ -486,6 +508,7 @@ function renderClientDashboard(){
     </div>
   `;
   document.getElementById('logout-btn').onclick = logout;
+  document.getElementById('theme-toggle-btn').onclick = toggleTheme;
   document.getElementById('f-q').oninput = e => { filters.client.q = e.target.value; renderClientTable(); };
   document.getElementById('f-equip').onchange = e => { filters.client.equip = e.target.value; renderClientTable(); };
   document.getElementById('f-status').onchange = e => { filters.client.status = e.target.value; renderClientTable(); };
@@ -614,6 +637,7 @@ function renderAdminDashboard(){
         </div>
         <div class="side-foot">
           <div class="side-tec">${escapeHTML(session.tecnicoNome||'')}</div>
+          ${themeToggleButton('block')}
           <button class="btn-ghost" id="logout-btn" style="width:100%; margin-top:8px;">Sair</button>
         </div>
       </div>
@@ -628,6 +652,7 @@ function renderAdminDashboard(){
     </div>
   `;
   document.getElementById('logout-btn').onclick = logout;
+  document.getElementById('theme-toggle-btn').onclick = toggleTheme;
   document.getElementById('at-resumo').onclick = () => { adminTab='resumo'; render(); };
   document.getElementById('at-ordens').onclick = () => { adminTab='ordens'; render(); };
   document.getElementById('at-equip').onclick = () => { adminTab='equip'; render(); };
@@ -1093,7 +1118,7 @@ function renderAdminEquip(){
       </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <span class="hint" id="equip-sel-count" style="margin:0; align-self:center;"></span>
-        <button class="btn-secondary" id="export-equip-csv-btn">Exportar selecionados (Excel/CSV)</button>
+        <button class="btn-secondary" id="export-equip-xlsx-btn">Exportar selecionados (Excel)</button>
         <button class="btn-secondary" id="export-equip-pdf-btn">Exportar selecionados (PDF)</button>
       </div>
     </div>
@@ -1114,10 +1139,10 @@ function renderAdminEquip(){
   document.getElementById('new-equip-btn').onclick = () => openEquipModal(null, CLIENTES[0]?.id || '');
   document.getElementById('ev-completa').onclick = () => { equipView = 'completa'; renderAdminEquip(); };
   document.getElementById('ev-simples').onclick = () => { equipView = 'simples'; renderAdminEquip(); };
-  document.getElementById('export-equip-csv-btn').onclick = () => {
+  document.getElementById('export-equip-xlsx-btn').onclick = () => {
     const list = currentEquipList.filter(e => selectedEquipIds.has(e.id));
     if(!list.length){ showToast('Selecione ao menos um equipamento pra exportar.'); return; }
-    exportEquipCSV(list);
+    exportEquipXLSX(list);
   };
   document.getElementById('export-equip-pdf-btn').onclick = () => {
     const list = currentEquipList.filter(e => selectedEquipIds.has(e.id));
@@ -1223,10 +1248,10 @@ function openEquipModal(id, presetClienteId, onSaved){
   const e = editing ? equipById(id) : { id: uid('eq'), clienteId: presetClienteId || (CLIENTES[0]?.id||''), nome:'', tipo:'Notebook', patrimonio:'', marca:'', modelo:'', cpu:'', ram:'', armazenamento:'', gpu:'', tela:'', so:'', licenca:'', acessorios:'', obs:'' };
   openModal(`
     <h3>${editing?'Editar equipamento':'Novo equipamento'}</h3>
-    <div class="field"><label>Cliente</label>
-      <select id="eq-cliente">${CLIENTES.map(c=>`<option value="${c.id}" ${c.id===e.clienteId?'selected':''}>${escapeHTML(c.nome)}</option>`).join('')}</select></div>
     <div class="field"><label>Nome do equipamento</label><input type="text" id="eq-nome" value="${escapeHTML(e.nome)}" placeholder="Ex: Dell G15"></div>
     <div class="field"><label>Tipo</label><select id="eq-tipo">${TIPO_LIST.map(t=>`<option ${t===e.tipo?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div class="field"><label>Cliente</label>
+      <select id="eq-cliente">${CLIENTES.map(c=>`<option value="${c.id}" ${c.id===e.clienteId?'selected':''}>${escapeHTML(c.nome)}</option>`).join('')}</select></div>
     <div class="field"><label>Nº Patrimônio / identificação</label><input type="text" id="eq-pat" value="${escapeHTML(e.patrimonio)}" placeholder="Ex: 03 ou CINZA"></div>
     <div class="field"><label>Marca</label><input type="text" id="eq-marca" value="${escapeHTML(e.marca)}"></div>
     <div class="field"><label>Modelo</label><input type="text" id="eq-modelo" value="${escapeHTML(e.modelo)}"></div>
@@ -1578,27 +1603,52 @@ async function exportPDF(list){
   showToast('PDF exportado.');
 }
 
-function exportEquipCSV(list){
+/* Colunas de exportação — mesmas usadas no Excel e no PDF, e respeitam o toggle Completa/Simplificada */
+function equipExportColumns(simples){
+  if(simples){
+    return [
+      { header:'EQUIPAMENTO',      get:e=>e.nome },
+      { header:'Nº PATRIMÔNIO',    get:e=>e.patrimonio||'' },
+      { header:'CLIENTE',          get:e=>clienteNome(e.clienteId) },
+      { header:'TIPO',             get:e=>e.tipo||'' },
+    ];
+  }
+  return [
+    { header:'EQUIPAMENTO',            get:e=>e.nome },
+    { header:'Nº PATRIMÔNIO',          get:e=>e.patrimonio||'' },
+    { header:'CLIENTE',                get:e=>clienteNome(e.clienteId) },
+    { header:'TIPO',                   get:e=>e.tipo||'' },
+    { header:'PROCESSADOR (CPU)',      get:e=>e.cpu||'' },
+    { header:'MEMÓRIA RAM',            get:e=>e.ram||'' },
+    { header:'ARMAZENAMENTO',          get:e=>e.armazenamento||'' },
+    { header:'PLACA DE VÍDEO (GPU)',   get:e=>e.gpu||'' },
+    { header:'SISTEMA OPERACIONAL',    get:e=>e.so||'' },
+    { header:'LICENÇA',                get:e=>e.licenca||'' },
+    { header:'OBSERVAÇÃO',             get:e=>e.obs||'' },
+    { header:'OUTROS / ACESSÓRIOS',    get:e=>e.acessorios||'' },
+    { header:'SERVIÇO REALIZADO',      get:e=>equipUltimoServico(e.id).servico },
+    { header:'DATA DO SERVIÇO',        get:e=>fmtDate(equipUltimoServico(e.id).data) },
+  ];
+}
+
+function exportEquipXLSX(list){
   if(!list || list.length === 0){ showToast('Nada para exportar.'); return; }
-  const headers = ['EQUIPAMENTO','Nº PATRIMÔNIO','PROCESSADOR (CPU)','MEMÓRIA RAM','ARMAZENAMENTO','PLACA DE VÍDEO (GPU)','SISTEMA OPERACIONAL','LICENÇA','OBSERVAÇÃO','OUTROS / ACESSÓRIOS','SERVIÇO REALIZADO','DATA DO SERVIÇO'];
-  const rows = list.map(e => {
-    const { servico, data } = equipUltimoServico(e.id);
-    return [e.nome, e.patrimonio||'', e.cpu||'', e.ram||'', e.armazenamento||'', e.gpu||'', e.so||'', e.licenca||'', e.obs||'', e.acessorios||'', servico, fmtDate(data)];
-  });
-  const escCsv = (v) => `"${String(v??'').replace(/"/g,'""')}"`;
-  const csv = [headers, ...rows].map(r => r.map(escCsv).join(';')).join('\r\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `equipamentos-${todayStr()}.csv`;
-  document.body.appendChild(a); a.click(); a.remove();
-  showToast('CSV exportado.');
+  if(!window.XLSX){ showToast('Biblioteca de planilha ainda carregando, tente novamente em instantes.'); return; }
+  const cols = equipExportColumns(equipView === 'simples');
+  const aoa = [cols.map(c=>c.header), ...list.map(e => cols.map(c=>c.get(e)))];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = cols.map(c => ({ wch: Math.max(c.header.length + 2, 14) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Equipamentos');
+  XLSX.writeFile(wb, `equipamentos-${todayStr()}.xlsx`);
+  showToast('Excel exportado.');
 }
 
 async function exportEquipPDF(list){
   if(!list || list.length === 0){ showToast('Nada para exportar.'); return; }
   if(!window.jspdf){ showToast('Biblioteca de PDF ainda carregando, tente novamente em instantes.'); return; }
   const { jsPDF } = window.jspdf;
+  const cols = equipExportColumns(equipView === 'simples');
   const pdf = new jsPDF({ orientation:'landscape' });
   const logoDataUrl = await loadLogoDataUrl();
   const textLeft = logoDataUrl ? 58 : 14;
@@ -1611,11 +1661,8 @@ async function exportEquipPDF(list){
   pdf.text(`Gerado em ${fmtDate(todayStr())}`, textLeft, 22);
   pdf.autoTable({
     startY: 28,
-    head: [['Equipamento','Patrimônio','CPU','RAM','Armaz.','GPU','SO','Licença','Acessórios','Serviço realizado','Data']],
-    body: list.map(e => {
-      const { servico, data } = equipUltimoServico(e.id);
-      return [e.nome, e.patrimonio||'—', e.cpu||'', e.ram||'', e.armazenamento||'', e.gpu||'', e.so||'', e.licenca||'', e.acessorios||'', servico, fmtDate(data)];
-    }),
+    head: [cols.map(c=>c.header)],
+    body: list.map(e => cols.map(c=>c.get(e))),
     styles: { fontSize: 7.5 },
     headStyles: { fillColor: [31,56,100] },
   });

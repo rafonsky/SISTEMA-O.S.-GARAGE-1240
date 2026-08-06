@@ -29,6 +29,33 @@
     --font-body: 'Inter', sans-serif;
     --font-mono: 'IBM Plex Mono', monospace;
   }
+  :root[data-theme="light"]{
+    --bg: #F5F3EE;
+    --panel: #FFFFFF;
+    --panel-2: #F1EEE6;
+    --line: #E1DCD0;
+    --text: #211D17;
+    --text-dim: #6B6558;
+    --amber: #B9740A;
+    --amber-dim: #FBE7C6;
+    --teal: #12796A;
+    --teal-dim: #D9F1EC;
+    --blue: #2F55B0;
+    --blue-dim: #DFE7FA;
+    --danger: #B23A30;
+    --danger-dim: #FBE0DD;
+  }
+  :root[data-theme="light"] body{
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(185,116,10,0.05), transparent 40%),
+      radial-gradient(circle at 85% 100%, rgba(18,121,106,0.05), transparent 40%);
+  }
+  :root[data-theme="light"] ::selection{ color:#fff; }
+  :root[data-theme="light"] .modal-overlay{ background:rgba(60,55,45,0.35); }
+  :root[data-theme="light"] .ticket, :root[data-theme="light"] .modal, :root[data-theme="light"] .os-card, :root[data-theme="light"] table{
+    box-shadow: 0 4px 18px rgba(30,25,15,0.06);
+  }
+  .theme-toggle-icon{ width:36px; height:36px; padding:0; display:inline-flex; align-items:center; justify-content:center; }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
