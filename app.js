@@ -24,6 +24,14 @@ const STATUS_META = {
 };
 const STATUS_LIST = Object.keys(STATUS_META);
 const TIPO_LIST = ["Notebook", "Desktop", "Periférico", "Outro"];
+const TIPO_META = {
+  "Notebook":   { color:"#5B8DEF", bg:"#182645" },
+  "Desktop":    { color:"#3FBFA8", bg:"#123b34" },
+  "Periférico": { color:"#A78BFA", bg:"#2b2140" },
+  "Outro":      { color:"#8F98A8", bg:"#242c38" },
+};
+const SO_LIST = ["Windows 11", "Windows 10", "Outro"];
+const LICENCA_LIST = ["Digital", "Sem licença", "Outro"];
 const CHECKLIST_ITENS = [
   { label: "Equipamento liga?", positive: true },
   { label: "Acompanha fonte/carregador?", positive: true },
@@ -68,6 +76,9 @@ let filters = {
   clientes: { q:'' },
   client:   { q:'', status:'' },
 };
+let equipView = 'completa'; // 'completa' | 'simples'
+let selectedEquipIds = new Set();
+let currentEquipList = []; // last rendered/filtered equipment list
 
 const $app = document.getElementById('app');
 const EYE_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
@@ -116,6 +127,7 @@ function equipSpecsLine(e){
   if(e.armazenamento) parts.push('Armaz.: '+e.armazenamento);
   if(e.gpu) parts.push('GPU: '+e.gpu);
   if(e.tela) parts.push('Tela: '+e.tela);
+  if(e.so) parts.push('SO: '+e.so);
   return parts.join(' · ');
 }
 function uniqueSorted(arr){ return [...new Set(arr.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')); }
@@ -421,6 +433,26 @@ function logout(){ session = { role:null, clientId:null }; clearSession(); rende
 function statusPill(status){
   const meta = STATUS_META[status] || STATUS_META['Em andamento'];
   return `<span class="status-pill ${meta.pulse?'pulse':''}" style="color:${meta.color}; background:${meta.bg};"><span class="led"></span>${escapeHTML(status)}</span>`;
+}
+function tipoPill(tipo){
+  const meta = TIPO_META[tipo] || TIPO_META['Outro'];
+  return `<span class="tipo-pill" style="color:${meta.color}; background:${meta.bg};">${escapeHTML(tipo||'Outro')}</span>`;
+}
+/* Último serviço realizado + data, derivado do histórico de O.S. do equipamento
+   (equivalente às colunas "SERVIÇO REALIZADO" / "DATA DO SERVIÇO" da planilha) */
+function equipUltimoServico(equipId){
+  const list = ORDENS.filter(o => o.equipamentoId === equipId);
+  if(!list.length) return { servico:'', data:'' };
+  const sorted = list.slice().sort((a,b) => {
+    const da = a.dataConclusao || a.dataEntrada || '';
+    const db = b.dataConclusao || b.dataEntrada || '';
+    return db.localeCompare(da);
+  });
+  const last = sorted[0];
+  return {
+    servico: last.diagnosticoTecnico || last.defeitoRelatado || '',
+    data: last.dataConclusao || last.dataEntrada || ''
+  };
 }
 
 /* ---------------- CLIENT DASHBOARD (list + filters) ---------------- */
@@ -1054,6 +1086,17 @@ function renderAdminEquip(){
   const body = document.getElementById('admin-body');
   const clienteOpts = CLIENTES.slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
   body.innerHTML = `
+    <div class="toolbar">
+      <div class="view-switch">
+        <button type="button" id="ev-completa" class="${equipView==='completa'?'active':''}">Completa</button>
+        <button type="button" id="ev-simples" class="${equipView==='simples'?'active':''}">Simplificada</button>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <span class="hint" id="equip-sel-count" style="margin:0; align-self:center;"></span>
+        <button class="btn-secondary" id="export-equip-csv-btn">Exportar selecionados (Excel/CSV)</button>
+        <button class="btn-secondary" id="export-equip-pdf-btn">Exportar selecionados (PDF)</button>
+      </div>
+    </div>
     <div class="filter-bar">
       <input class="search-input" id="f-q" placeholder="Buscar equipamento, patrimônio..." value="${escapeHTML(filters.equip.q)}">
       <button type="button" class="filter-toggle-btn">Filtros ▾</button>
@@ -1069,7 +1112,23 @@ function renderAdminEquip(){
   document.getElementById('f-cliente').onchange = e => { filters.equip.cliente = e.target.value; renderEquipTable(); };
   document.getElementById('f-tipo').onchange = e => { filters.equip.tipo = e.target.value; renderEquipTable(); };
   document.getElementById('new-equip-btn').onclick = () => openEquipModal(null, CLIENTES[0]?.id || '');
+  document.getElementById('ev-completa').onclick = () => { equipView = 'completa'; renderAdminEquip(); };
+  document.getElementById('ev-simples').onclick = () => { equipView = 'simples'; renderAdminEquip(); };
+  document.getElementById('export-equip-csv-btn').onclick = () => {
+    const list = currentEquipList.filter(e => selectedEquipIds.has(e.id));
+    if(!list.length){ showToast('Selecione ao menos um equipamento pra exportar.'); return; }
+    exportEquipCSV(list);
+  };
+  document.getElementById('export-equip-pdf-btn').onclick = () => {
+    const list = currentEquipList.filter(e => selectedEquipIds.has(e.id));
+    if(!list.length){ showToast('Selecione ao menos um equipamento pra exportar.'); return; }
+    exportEquipPDF(list);
+  };
   renderEquipTable();
+}
+function updateEquipSelCount(){
+  const el = document.getElementById('equip-sel-count');
+  if(el) el.textContent = selectedEquipIds.size ? `${selectedEquipIds.size} selecionado${selectedEquipIds.size===1?'':'s'}` : '';
 }
 function renderEquipTable(){
   const wrap = document.getElementById('equip-table-wrap');
@@ -1081,28 +1140,66 @@ function renderEquipTable(){
     const matchesTipo = !filters.equip.tipo || e.tipo === filters.equip.tipo;
     return matchesQ && matchesCliente && matchesTipo;
   }).sort((a,b) => a.nome.localeCompare(b.nome,'pt-BR'));
+  currentEquipList = list;
+  selectedEquipIds.forEach(id => { if(!list.find(e=>e.id===id)) selectedEquipIds.delete(id); });
+  updateEquipSelCount();
 
   if(list.length === 0){ wrap.innerHTML = `<div class="empty">Nenhum equipamento encontrado.</div>`; return; }
+  const allChecked = list.length > 0 && list.every(e => selectedEquipIds.has(e.id));
+  const simples = equipView === 'simples';
+
+  const headCols = simples
+    ? `<th>Equipamento</th><th>Patrimônio</th><th>Cliente</th><th>Tipo</th><th></th>`
+    : `<th>Equipamento</th><th>Tipo</th><th>Cliente</th><th>Patrimônio</th><th>Marca/Modelo</th><th>Acessórios</th><th>O.S. vinculadas</th><th></th>`;
+
   wrap.innerHTML = `
     <table><thead><tr>
-      <th>Equipamento</th><th>Tipo</th><th>Cliente</th><th>Patrimônio</th><th>Marca/Modelo</th><th>O.S. vinculadas</th><th></th>
+      <th class="checkbox-cell"><input type="checkbox" id="equip-select-all" ${allChecked?'checked':''}></th>
+      ${headCols}
     </tr></thead><tbody>
-      ${list.map(e => `
-        <tr>
-          <td data-label="Equipamento">${escapeHTML(e.nome)}${equipSpecsLine(e) ? `<br><span style="font-size:11px; color:var(--text-dim);">${escapeHTML(equipSpecsLine(e))}</span>` : ''}</td>
-          <td data-label="Tipo">${escapeHTML(e.tipo||'—')}</td>
-          <td data-label="Cliente">${escapeHTML(clienteNome(e.clienteId))}</td>
-          <td data-label="Patrimônio">${escapeHTML(e.patrimonio)||'—'}</td>
-          <td data-label="Marca/Modelo">${escapeHTML([e.marca,e.modelo].filter(Boolean).join(' / '))||'—'}</td>
-          <td data-label="O.S."><button class="row-btn" data-viewos="${e.id}">${ORDENS.filter(o=>o.equipamentoId===e.id).length}</button></td>
-          <td data-label="">
-            <button class="row-btn" data-edit="${e.id}">Editar</button>
-            <button class="row-btn row-btn-danger" data-del="${e.id}">Excluir</button>
-          </td>
-        </tr>
-      `).join('')}
+      ${list.map(e => {
+        const checked = selectedEquipIds.has(e.id) ? 'checked' : '';
+        if(simples){
+          return `
+            <tr>
+              <td class="checkbox-cell" data-label=""><input type="checkbox" class="equip-row-check" data-id="${e.id}" ${checked}></td>
+              <td data-label="Equipamento">${escapeHTML(e.nome)}</td>
+              <td data-label="Patrimônio">${escapeHTML(e.patrimonio)||'—'}</td>
+              <td data-label="Cliente">${escapeHTML(clienteNome(e.clienteId))}</td>
+              <td data-label="Tipo">${tipoPill(e.tipo)}</td>
+              <td data-label="">
+                <button class="row-btn" data-edit="${e.id}">Editar</button>
+              </td>
+            </tr>`;
+        }
+        return `
+          <tr>
+            <td class="checkbox-cell" data-label=""><input type="checkbox" class="equip-row-check" data-id="${e.id}" ${checked}></td>
+            <td data-label="Equipamento">${escapeHTML(e.nome)}${equipSpecsLine(e) ? `<br><span style="font-size:11px; color:var(--text-dim);">${escapeHTML(equipSpecsLine(e))}</span>` : ''}</td>
+            <td data-label="Tipo">${tipoPill(e.tipo)}</td>
+            <td data-label="Cliente">${escapeHTML(clienteNome(e.clienteId))}</td>
+            <td data-label="Patrimônio">${escapeHTML(e.patrimonio)||'—'}</td>
+            <td data-label="Marca/Modelo">${escapeHTML([e.marca,e.modelo].filter(Boolean).join(' / '))||'—'}</td>
+            <td data-label="Acessórios">${escapeHTML(e.acessorios)||'—'}</td>
+            <td data-label="O.S."><button class="row-btn" data-viewos="${e.id}">${ORDENS.filter(o=>o.equipamentoId===e.id).length}</button></td>
+            <td data-label="">
+              <button class="row-btn" data-edit="${e.id}">Editar</button>
+              <button class="row-btn row-btn-danger" data-del="${e.id}">Excluir</button>
+            </td>
+          </tr>`;
+      }).join('')}
     </tbody></table>
   `;
+  document.getElementById('equip-select-all').onchange = (e) => {
+    if(e.target.checked){ list.forEach(x => selectedEquipIds.add(x.id)); }
+    else { list.forEach(x => selectedEquipIds.delete(x.id)); }
+    renderEquipTable();
+  };
+  wrap.querySelectorAll('.equip-row-check').forEach(cb => cb.onchange = () => {
+    if(cb.checked) selectedEquipIds.add(cb.dataset.id); else selectedEquipIds.delete(cb.dataset.id);
+    updateEquipSelCount();
+    document.getElementById('equip-select-all').checked = list.every(e => selectedEquipIds.has(e.id));
+  });
   wrap.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEquipModal(b.dataset.edit, null));
   wrap.querySelectorAll('[data-viewos]').forEach(b => b.onclick = () => {
     const e = equipById(b.dataset.viewos);
@@ -1116,13 +1213,14 @@ function renderEquipTable(){
     confirmDelete('Excluir este equipamento?', 'Essa ação não pode ser desfeita.', async () => {
       await deleteEquip(b.dataset.del);
       EQUIPAMENTOS = EQUIPAMENTOS.filter(x=>x.id!==b.dataset.del);
+      selectedEquipIds.delete(b.dataset.del);
       render(); showToast('Equipamento excluído.');
     });
   });
 }
 function openEquipModal(id, presetClienteId, onSaved){
   const editing = !!id;
-  const e = editing ? equipById(id) : { id: uid('eq'), clienteId: presetClienteId || (CLIENTES[0]?.id||''), nome:'', tipo:'Notebook', patrimonio:'', marca:'', modelo:'', cpu:'', ram:'', armazenamento:'', gpu:'', tela:'', obs:'' };
+  const e = editing ? equipById(id) : { id: uid('eq'), clienteId: presetClienteId || (CLIENTES[0]?.id||''), nome:'', tipo:'Notebook', patrimonio:'', marca:'', modelo:'', cpu:'', ram:'', armazenamento:'', gpu:'', tela:'', so:'', licenca:'', acessorios:'', obs:'' };
   openModal(`
     <h3>${editing?'Editar equipamento':'Novo equipamento'}</h3>
     <div class="field"><label>Cliente</label>
@@ -1137,6 +1235,17 @@ function openEquipModal(id, presetClienteId, onSaved){
     <div class="field"><label>Armazenamento</label><input type="text" id="eq-armaz" value="${escapeHTML(e.armazenamento)}" placeholder="Ex: SSD 512GB"></div>
     <div class="field"><label>Placa de vídeo (GPU)</label><input type="text" id="eq-gpu" value="${escapeHTML(e.gpu)}" placeholder="Ex: RTX 4060"></div>
     <div class="field"><label>Tela</label><input type="text" id="eq-tela" value="${escapeHTML(e.tela)}" placeholder="Ex: 15.6&quot; Full HD (deixe em branco se não se aplica)"></div>
+    <div class="row3-field-group" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="field"><label>Sistema Operacional</label>
+        <input type="text" id="eq-so" list="eq-so-list" value="${escapeHTML(e.so)}" placeholder="Ex: WIN 11">
+        <datalist id="eq-so-list">${SO_LIST.map(s=>`<option value="${s}">`).join('')}</datalist>
+      </div>
+      <div class="field"><label>Licença</label>
+        <input type="text" id="eq-licenca" list="eq-licenca-list" value="${escapeHTML(e.licenca)}" placeholder="Ex: Digital">
+        <datalist id="eq-licenca-list">${LICENCA_LIST.map(s=>`<option value="${s}">`).join('')}</datalist>
+      </div>
+    </div>
+    <div class="field"><label>Outros / Acessórios</label><textarea id="eq-acessorios" placeholder="Ex: Decklink Quad, HD Mini Recorder...">${escapeHTML(e.acessorios)}</textarea></div>
     <div class="field"><label>Observação</label><textarea id="eq-obs">${escapeHTML(e.obs)}</textarea></div>
     <div class="modal-actions">
       <button class="btn-secondary" id="eq-cancel">Cancelar</button>
@@ -1165,6 +1274,9 @@ function openEquipModal(id, presetClienteId, onSaved){
       armazenamento: document.getElementById('eq-armaz').value.trim(),
       gpu: document.getElementById('eq-gpu').value.trim(),
       tela: document.getElementById('eq-tela').value.trim(),
+      so: document.getElementById('eq-so').value.trim(),
+      licenca: document.getElementById('eq-licenca').value.trim(),
+      acessorios: document.getElementById('eq-acessorios').value.trim(),
       obs: document.getElementById('eq-obs').value.trim(),
     };
     if(!data.nome){ showToast('Informe o nome do equipamento.'); return; }
@@ -1453,6 +1565,51 @@ async function exportPDF(list){
     headStyles: { fillColor: [31,56,100] },
   });
   pdf.save(`ordens-de-servico-${todayStr()}.pdf`);
+  showToast('PDF exportado.');
+}
+
+function exportEquipCSV(list){
+  if(!list || list.length === 0){ showToast('Nada para exportar.'); return; }
+  const headers = ['EQUIPAMENTO','Nº PATRIMÔNIO','PROCESSADOR (CPU)','MEMÓRIA RAM','ARMAZENAMENTO','PLACA DE VÍDEO (GPU)','SISTEMA OPERACIONAL','LICENÇA','OBSERVAÇÃO','OUTROS / ACESSÓRIOS','SERVIÇO REALIZADO','DATA DO SERVIÇO'];
+  const rows = list.map(e => {
+    const { servico, data } = equipUltimoServico(e.id);
+    return [e.nome, e.patrimonio||'', e.cpu||'', e.ram||'', e.armazenamento||'', e.gpu||'', e.so||'', e.licenca||'', e.obs||'', e.acessorios||'', servico, fmtDate(data)];
+  });
+  const escCsv = (v) => `"${String(v??'').replace(/"/g,'""')}"`;
+  const csv = [headers, ...rows].map(r => r.map(escCsv).join(';')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `equipamentos-${todayStr()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  showToast('CSV exportado.');
+}
+
+async function exportEquipPDF(list){
+  if(!list || list.length === 0){ showToast('Nada para exportar.'); return; }
+  if(!window.jspdf){ showToast('Biblioteca de PDF ainda carregando, tente novamente em instantes.'); return; }
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation:'landscape' });
+  const logoDataUrl = await loadLogoDataUrl();
+  const textLeft = logoDataUrl ? 58 : 14;
+  if(logoDataUrl){
+    try{ pdf.addImage(logoDataUrl, 'PNG', 14, 8, 40, 10.9); }catch(e){ /* segue sem logo */ }
+  }
+  pdf.setFontSize(14);
+  pdf.text('Inventário de Equipamentos', textLeft, 16);
+  pdf.setFontSize(9);
+  pdf.text(`Gerado em ${fmtDate(todayStr())}`, textLeft, 22);
+  pdf.autoTable({
+    startY: 28,
+    head: [['Equipamento','Patrimônio','CPU','RAM','Armaz.','GPU','SO','Licença','Acessórios','Serviço realizado','Data']],
+    body: list.map(e => {
+      const { servico, data } = equipUltimoServico(e.id);
+      return [e.nome, e.patrimonio||'—', e.cpu||'', e.ram||'', e.armazenamento||'', e.gpu||'', e.so||'', e.licenca||'', e.acessorios||'', servico, fmtDate(data)];
+    }),
+    styles: { fontSize: 7.5 },
+    headStyles: { fillColor: [31,56,100] },
+  });
+  pdf.save(`equipamentos-${todayStr()}.pdf`);
   showToast('PDF exportado.');
 }
 
