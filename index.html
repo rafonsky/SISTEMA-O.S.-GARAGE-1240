@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Portal de Acompanhamento — Ordens de Serviço</title>
-<link rel="icon" type="image/png" href="assets/favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -82,10 +81,12 @@
   }
   .brand{display:flex; align-items:center; gap:10px;}
   .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--amber); box-shadow:0 0 10px var(--amber);}
-  .brand-icon{height:30px; width:auto; display:block; filter:drop-shadow(0 0 6px rgba(232,163,61,0.25));}
   .brand-text{font-family:var(--font-display); font-weight:700; letter-spacing:0.02em; font-size:15px;}
   .brand-text small{display:block; font-family:var(--font-body); font-weight:400; color:var(--text-dim); font-size:11px; letter-spacing:0.03em; margin-top:2px;}
-  .login-logo{display:block; height:64px; width:auto; margin:0 auto 14px auto;}
+  .login-wordmark{display:block; text-align:center; margin:0 0 16px 0; font-family:var(--font-display); font-weight:700; letter-spacing:0.02em;}
+  .login-wordmark .g-word{font-size:22px; color:var(--text);}
+  .login-wordmark .n-word{font-size:22px; color:var(--amber); font-family:var(--font-mono);}
+  .login-wordmark small{display:block; font-family:var(--font-body); font-weight:400; color:var(--text-dim); font-size:11px; letter-spacing:0.03em; margin-top:2px;}
   .topbar-right{display:flex; align-items:center; gap:14px; font-size:13px; color:var(--text-dim);}
   .btn-ghost{
     background:transparent; border:1px solid var(--line); color:var(--text);

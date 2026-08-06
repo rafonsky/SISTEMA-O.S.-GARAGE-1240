@@ -367,7 +367,7 @@ function renderLogin(){
     <div class="login-wrap">
       <div class="ticket">
         <div class="ticket-head">
-          <img src="assets/logo-full.png" class="login-logo" alt="Garage 1240">
+          <span class="login-wordmark"><span class="g-word">GARAGE</span> <span class="n-word">1240</span><small>Computadores &amp; Audiovisual</small></span>
           <h1>Acompanhe sua O.S.</h1>
           <p>Consulte o histórico e status dos equipamentos que passaram ou estão com a gente.</p>
         </div>
@@ -1580,17 +1580,16 @@ async function exportPDF(list){
   if(!window.jspdf){ showToast('Biblioteca de PDF ainda carregando, tente novamente em instantes.'); return; }
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation:'landscape' });
-  const logoDataUrl = await loadLogoDataUrl();
-  const textLeft = logoDataUrl ? 58 : 14;
-  if(logoDataUrl){
-    try{ pdf.addImage(logoDataUrl, 'PNG', 14, 8, 40, 10.9); }catch(e){ /* segue sem logo */ }
-  }
+  pdf.setFontSize(12);
+  pdf.setFont(undefined, 'bold');
+  pdf.text('GARAGE 1240', 14, 14);
+  pdf.setFont(undefined, 'normal');
   pdf.setFontSize(14);
-  pdf.text('Ordens de Serviço', textLeft, 16);
+  pdf.text('Ordens de Serviço', 14, 22);
   pdf.setFontSize(9);
-  pdf.text(`Gerado em ${fmtDate(todayStr())}`, textLeft, 22);
+  pdf.text(`Gerado em ${fmtDate(todayStr())}`, 14, 28);
   pdf.autoTable({
-    startY: 28,
+    startY: 34,
     head: [['O.S.','Cliente','Equipamento','Patrimônio','Status','Entrada','Conclusão','Observação']],
     body: list.map(o => [
       o.id, clienteNome(o.clienteId), equipNome(o.equipamentoId), equipPatrimonio(o.equipamentoId)||'—',
@@ -1650,17 +1649,16 @@ async function exportEquipPDF(list){
   const { jsPDF } = window.jspdf;
   const cols = equipExportColumns(equipView === 'simples');
   const pdf = new jsPDF({ orientation:'landscape' });
-  const logoDataUrl = await loadLogoDataUrl();
-  const textLeft = logoDataUrl ? 58 : 14;
-  if(logoDataUrl){
-    try{ pdf.addImage(logoDataUrl, 'PNG', 14, 8, 40, 10.9); }catch(e){ /* segue sem logo */ }
-  }
+  pdf.setFontSize(12);
+  pdf.setFont(undefined, 'bold');
+  pdf.text('GARAGE 1240', 14, 14);
+  pdf.setFont(undefined, 'normal');
   pdf.setFontSize(14);
-  pdf.text('Inventário de Equipamentos', textLeft, 16);
+  pdf.text('Inventário de Equipamentos', 14, 22);
   pdf.setFontSize(9);
-  pdf.text(`Gerado em ${fmtDate(todayStr())}`, textLeft, 22);
+  pdf.text(`Gerado em ${fmtDate(todayStr())}`, 14, 28);
   pdf.autoTable({
-    startY: 28,
+    startY: 34,
     head: [cols.map(c=>c.header)],
     body: list.map(e => cols.map(c=>c.get(e))),
     styles: { fontSize: 7.5 },
@@ -1848,24 +1846,6 @@ function renderImportPreview(candidates, clienteId){
   };
 }
 
-let _logoDataUrlCache = null;
-async function loadLogoDataUrl(){
-  if(_logoDataUrlCache !== null) return _logoDataUrlCache;
-  try{
-    const res = await fetch('assets/logo-pdf.png');
-    const blob = await res.blob();
-    _logoDataUrlCache = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }catch(e){
-    _logoDataUrlCache = false; // marca que falhou, não tenta de novo
-  }
-  return _logoDataUrlCache;
-}
-
 async function exportSingleOsPDF(o){
   if(!o){ showToast('O.S. não encontrada.'); return; }
   if(!window.jspdf){ showToast('Biblioteca de PDF ainda carregando, tente novamente em instantes.'); return; }
@@ -1884,11 +1864,10 @@ async function exportSingleOsPDF(o){
     line(5 + lines.length*5);
   };
 
-  const logoDataUrl = await loadLogoDataUrl();
-  if(logoDataUrl){
-    const logoW = 62, logoH = 17;
-    try{ pdf.addImage(logoDataUrl, 'PNG', 105-logoW/2, y-10, logoW, logoH); y += logoH - 6; }catch(e){ /* segue sem logo */ }
-  }
+  pdf.setFontSize(15); pdf.setFont(undefined,'bold');
+  pdf.text('GARAGE 1240', 105, y, { align:'center' });
+  pdf.setFont(undefined,'normal');
+  line(8);
 
   pdf.setFontSize(16); pdf.setFont(undefined,'bold');
   pdf.text('ORDEM DE SERVIÇO', left, y);
@@ -1973,11 +1952,9 @@ async function exportRecibo(o){
   const left = 14, right = 196;
   let y = 20;
 
-  const logoDataUrl = await loadLogoDataUrl();
-  if(logoDataUrl){
-    const logoW = 62, logoH = 17;
-    try{ pdf.addImage(logoDataUrl, 'PNG', 105-logoW/2, y-12, logoW, logoH); y += logoH - 4; }catch(e){ /* segue sem logo */ }
-  }
+  pdf.setFontSize(13); pdf.setFont(undefined,'bold');
+  pdf.text('GARAGE 1240', 105, y, { align:'center' });
+  y += 8;
 
   pdf.setFontSize(16); pdf.setFont(undefined,'bold');
   pdf.text('RECIBO DE PAGAMENTO', 105, y, { align:'center' });
