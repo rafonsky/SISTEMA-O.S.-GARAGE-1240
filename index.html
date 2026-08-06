@@ -302,6 +302,13 @@
 
   /* ---------- Tabbed modal variant ---------- */
   .modal-tabbed{padding:0; width:600px;}
+  .modal-wide{width:780px; max-width:96vw;}
+  .import-badge{display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600;}
+  .import-badge.novo{background:var(--teal-dim); color:var(--teal);}
+  .import-badge.conflito{background:var(--amber-dim); color:var(--amber);}
+  .import-table-wrap{max-height:340px; overflow-y:auto; border:1px solid var(--line); border-radius:10px;}
+  .import-table-wrap table{border-radius:0;}
+  .import-table-wrap thead th{position:sticky; top:0; background:var(--panel); z-index:1;}
   .modal-head-bar{
     background:var(--panel-2); padding:18px 22px; display:flex; align-items:center; gap:14px;
     border-bottom:1px solid var(--line); border-radius:14px 14px 0 0;
@@ -410,6 +417,7 @@
 <div id="app"><div class="loading">Conectando ao Firestore…</div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

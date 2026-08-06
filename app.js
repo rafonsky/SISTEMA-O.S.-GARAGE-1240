@@ -1464,7 +1464,17 @@ function renderAdminConfig(){
         <div class="hint">Usado para montar o link enviado ao cliente com o PIN e nas mensagens de atualização de status.</div>
       </div>
     </div>
+    <div class="toolbar" style="margin-top:28px;">
+      <div><h3 style="margin:0; font-family:var(--font-display); font-size:15px;">Importar equipamentos</h3></div>
+    </div>
+    <div class="ticket" style="width:420px; max-width:100%;">
+      <div class="ticket-body" style="padding-top:22px;">
+        <div class="hint" style="margin-top:0; margin-bottom:14px;">Traz equipamentos de uma planilha Excel (.xlsx) ou CSV — do jeito que o cliente já usa — direto pro sistema.</div>
+        <button class="btn-primary" id="import-equip-btn">Importar planilha</button>
+      </div>
+    </div>
   `;
+  document.getElementById('import-equip-btn').onclick = () => openImportEquipModal();
   document.getElementById('new-tec-btn').onclick = () => openTecnicoModal(null);
   body.querySelectorAll('[data-edit-tec]').forEach(b => b.onclick = () => openTecnicoModal(b.dataset.editTec));
   body.querySelectorAll('[data-del-tec]').forEach(b => b.onclick = () => {
@@ -1611,6 +1621,184 @@ async function exportEquipPDF(list){
   });
   pdf.save(`equipamentos-${todayStr()}.pdf`);
   showToast('PDF exportado.');
+}
+
+/* ---------------- IMPORTAR EQUIPAMENTOS DE PLANILHA ---------------- */
+function normalizeHeader(s){
+  return String(s||'')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // remove acentos
+    .toUpperCase().replace(/\s+/g,' ').trim();
+}
+const IMPORT_FIELD_MATCHERS = [
+  { field:'nome',        test:h => h === 'EQUIPAMENTO' },
+  { field:'patrimonio',  test:h => h.includes('PATRIMONIO') },
+  { field:'cpu',         test:h => h.includes('PROCESSADOR') || h === 'CPU' || h.includes('CPU') },
+  { field:'ram',         test:h => h.includes('RAM') },
+  { field:'armazenamento', test:h => h.includes('ARMAZENAMENTO') },
+  { field:'gpu',         test:h => h.includes('GPU') || h.includes('PLACA DE VIDEO') },
+  { field:'so',          test:h => h.includes('SISTEMA OPERACIONAL') || h === 'SO' },
+  { field:'licenca',     test:h => h.includes('LICEN') },
+  { field:'obs',         test:h => h.includes('OBSERVA') },
+  { field:'acessorios',  test:h => h.includes('ACESSORIO') || h.includes('OUTROS') },
+  { field:'marca',       test:h => h.includes('MARCA') },
+  { field:'modelo',      test:h => h.includes('MODELO') },
+  { field:'tipo',        test:h => h === 'TIPO' },
+];
+function inferTipo(nome){
+  const n = normalizeHeader(nome);
+  if(n.includes('DESKTOP') || n.includes('CPU GAMER') || n.includes('GABINETE')) return 'Desktop';
+  if(n.includes('NOTEBOOK') || n.includes('NITRO') || n.includes('DELL') || n.includes('ACER') || n.includes('LENOVO') || n.includes('ASUS') || n.includes('ALIENWARE')) return 'Notebook';
+  return 'Notebook';
+}
+function openImportEquipModal(){
+  const clienteOpts = CLIENTES.slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+  openModal(`
+    <h3>Importar planilha de equipamentos</h3>
+    <div class="field"><label>Cliente (todos os equipamentos da planilha serão vinculados a ele)</label>
+      <select id="imp-cliente">${clienteOpts.map(c=>`<option value="${c.id}">${escapeHTML(c.nome)}</option>`).join('')}</select>
+    </div>
+    <div class="field"><label>Arquivo (.xlsx ou .csv)</label>
+      <input type="file" id="imp-file" accept=".xlsx,.xls,.csv">
+    </div>
+    <div class="hint">Colunas reconhecidas: Equipamento, Nº Patrimônio, Processador (CPU), Memória RAM, Armazenamento, Placa de vídeo (GPU), Sistema Operacional, Licença, Observação, Outros/Acessórios, Marca, Modelo. As colunas "Serviço realizado" e "Data do serviço" não são importadas — esse histórico continua sendo controlado pelas O.S., não pelo cadastro de equipamento.</div>
+    <div id="imp-error" class="err"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="imp-cancel">Cancelar</button>
+      <button class="btn-small-primary" id="imp-analisar">Analisar planilha</button>
+    </div>
+  `);
+  document.getElementById('imp-cancel').onclick = closeModal;
+  document.getElementById('imp-analisar').onclick = () => {
+    const fileInput = document.getElementById('imp-file');
+    const clienteId = document.getElementById('imp-cliente').value;
+    const file = fileInput.files[0];
+    const errEl = document.getElementById('imp-error');
+    if(!file){ errEl.textContent = 'Selecione um arquivo primeiro.'; return; }
+    if(!window.XLSX){ errEl.textContent = 'Biblioteca de planilha ainda carregando, tente novamente em instantes.'; return; }
+    errEl.textContent = '';
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try{
+        const data = new Uint8Array(ev.target.result);
+        const wb = XLSX.read(data, { type:'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'', raw:false });
+        const candidates = parseImportRows(rows, clienteId);
+        if(candidates.length === 0){ errEl.textContent = 'Não encontrei nenhuma linha com nome de equipamento preenchido.'; return; }
+        closeModal();
+        renderImportPreview(candidates, clienteId);
+      }catch(err){
+        errEl.textContent = 'Não consegui ler esse arquivo. Confirme se é um .xlsx ou .csv válido.';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+}
+function parseImportRows(rows, clienteId){
+  // encontra a linha de cabeçalho: a primeira linha que contenha "EQUIPAMENTO"
+  let headerRowIdx = rows.findIndex(r => r.some(cell => normalizeHeader(cell) === 'EQUIPAMENTO'));
+  if(headerRowIdx === -1) headerRowIdx = 0;
+  const headerRow = rows[headerRowIdx];
+  const colMap = {}; // índice da coluna -> nome do campo
+  headerRow.forEach((cell, idx) => {
+    const h = normalizeHeader(cell);
+    const match = IMPORT_FIELD_MATCHERS.find(m => m.test(h));
+    if(match) colMap[idx] = match.field;
+  });
+  const candidates = [];
+  for(let i = headerRowIdx + 1; i < rows.length; i++){
+    const row = rows[i];
+    if(!row || row.every(c => String(c||'').trim() === '')) continue;
+    const data = { nome:'', patrimonio:'', cpu:'', ram:'', armazenamento:'', gpu:'', so:'', licenca:'', obs:'', acessorios:'', marca:'', modelo:'', tipo:'' };
+    Object.entries(colMap).forEach(([idx, field]) => { data[field] = String(row[idx]||'').trim(); });
+    if(!data.nome) continue;
+    if(!data.tipo) data.tipo = inferTipo(data.nome);
+    if(!TIPO_LIST.includes(data.tipo)) data.tipo = 'Outro';
+    // procura conflito: mesmo cliente + (patrimônio igual, quando preenchido) ou nome igual
+    const existing = EQUIPAMENTOS.find(e => e.clienteId === clienteId && (
+      (data.patrimonio && e.patrimonio && e.patrimonio.trim().toLowerCase() === data.patrimonio.trim().toLowerCase()) ||
+      (e.nome.trim().toLowerCase() === data.nome.trim().toLowerCase())
+    ));
+    candidates.push({
+      data, clienteId,
+      existingId: existing ? existing.id : null,
+      action: existing ? 'ignorar' : 'novo', // conflito default = ignorar, até o usuário decidir
+    });
+  }
+  return candidates;
+}
+function renderImportPreview(candidates, clienteId){
+  const clienteNomeSel = clienteNome(clienteId);
+  openModal(`
+    <h3>Conferir importação — ${escapeHTML(clienteNomeSel)}</h3>
+    <div class="hint" style="margin-top:0;">${candidates.length} linha(s) encontrada(s). Linhas em conflito (já existem no sistema) vêm marcadas pra "Ignorar" por padrão — escolha "Atualizar" se quiser sobrescrever os dados.</div>
+    <div class="import-table-wrap">
+      <table><thead><tr>
+        <th style="width:26px;"><input type="checkbox" id="imp-select-all" checked></th>
+        <th>Equipamento</th><th>Patrimônio</th><th>Tipo</th><th>Status</th><th>Ação</th>
+      </tr></thead><tbody>
+        ${candidates.map((c,i) => `
+          <tr>
+            <td><input type="checkbox" class="imp-row-check" data-i="${i}" checked></td>
+            <td>${escapeHTML(c.data.nome)}</td>
+            <td>${escapeHTML(c.data.patrimonio)||'—'}</td>
+            <td>${escapeHTML(c.data.tipo)}</td>
+            <td>${c.existingId ? '<span class="import-badge conflito">Conflito</span>' : '<span class="import-badge novo">Novo</span>'}</td>
+            <td>${c.existingId ? `
+              <select class="select imp-action" data-i="${i}" style="padding:5px 8px; font-size:12px;">
+                <option value="ignorar" selected>Ignorar (manter o existente)</option>
+                <option value="atualizar">Atualizar com os dados da planilha</option>
+              </select>
+            ` : '<span class="hint" style="margin:0;">Será criado</span>'}</td>
+          </tr>
+        `).join('')}
+      </tbody></table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="imp-back">Voltar</button>
+      <button class="btn-small-primary" id="imp-confirm">Confirmar importação</button>
+    </div>
+  `, 'modal-wide');
+  document.getElementById('imp-select-all').onchange = (e) => {
+    document.querySelectorAll('.imp-row-check').forEach(cb => cb.checked = e.target.checked);
+  };
+  document.querySelectorAll('.imp-action').forEach(sel => sel.onchange = (e) => {
+    candidates[Number(e.target.dataset.i)].action = e.target.value;
+  });
+  document.getElementById('imp-back').onclick = () => { closeModal(); openImportEquipModal(); };
+  document.getElementById('imp-confirm').onclick = async () => {
+    const btn = document.getElementById('imp-confirm');
+    btn.textContent = 'Importando...'; btn.disabled = true;
+    let criados = 0, atualizados = 0, ignorados = 0;
+    const checks = document.querySelectorAll('.imp-row-check');
+    for(const cb of checks){
+      const i = Number(cb.dataset.i);
+      const c = candidates[i];
+      if(!cb.checked){ ignorados++; continue; }
+      if(!c.existingId){
+        const novo = { id: uid('eq'), clienteId, nome:c.data.nome, tipo:c.data.tipo, patrimonio:c.data.patrimonio,
+          marca:c.data.marca, modelo:c.data.modelo, cpu:c.data.cpu, ram:c.data.ram, armazenamento:c.data.armazenamento,
+          gpu:c.data.gpu, tela:'', so:c.data.so, licenca:c.data.licenca, acessorios:c.data.acessorios, obs:c.data.obs };
+        EQUIPAMENTOS.push(novo);
+        await saveEquip(novo);
+        criados++;
+      } else if(c.action === 'atualizar'){
+        const existing = equipById(c.existingId);
+        Object.assign(existing, { nome:c.data.nome, tipo:c.data.tipo, patrimonio:c.data.patrimonio||existing.patrimonio,
+          marca:c.data.marca||existing.marca, modelo:c.data.modelo||existing.modelo, cpu:c.data.cpu||existing.cpu,
+          ram:c.data.ram||existing.ram, armazenamento:c.data.armazenamento||existing.armazenamento, gpu:c.data.gpu||existing.gpu,
+          so:c.data.so||existing.so, licenca:c.data.licenca||existing.licenca, acessorios:c.data.acessorios||existing.acessorios,
+          obs:c.data.obs||existing.obs });
+        await saveEquip(existing);
+        atualizados++;
+      } else {
+        ignorados++;
+      }
+    }
+    closeModal();
+    render();
+    showToast(`Importação concluída: ${criados} criado(s), ${atualizados} atualizado(s), ${ignorados} ignorado(s).`);
+  };
 }
 
 let _logoDataUrlCache = null;
