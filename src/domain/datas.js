@@ -23,3 +23,10 @@ export function periodoTexto(inicio, fim) {
   if (ya === yb && ma === mb) return `${da} a ${db}/${mb}/${yb}`;
   return `${fmtData(a)} a ${fmtData(b)}`;
 }
+
+export function dataValida(d) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d))) return false;
+  const [a, m, dia] = d.split('-').map(Number);
+  const dt = new Date(Date.UTC(a, m - 1, dia));
+  return dt.getUTCFullYear() === a && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === dia;
+}

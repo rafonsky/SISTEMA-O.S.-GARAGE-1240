@@ -1,18 +1,12 @@
 import { STATUS_LIST } from '../domain/status.js';
 import { normalizeNome } from '../domain/serial.js';
+import { dataValida } from '../domain/datas.js';
 
 const SPECS = ['cpu', 'ram', 'armazenamento', 'gpu', 'tela', 'so', 'licenca'];
 const s = (v) => (v === undefined || v === null ? '' : String(v).trim());
 
 const ehLinhaDePlanilha = (nome) =>
   /^(observa[cç][aã]o|legenda)\s*:/i.test(nome) || /\(\d{2}\)\s*\d{4,5}-\d{4}/.test(nome);
-
-function dataValida(d) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
-  const [a, m, dia] = d.split('-').map(Number);
-  const dt = new Date(Date.UTC(a, m - 1, dia));
-  return dt.getUTCFullYear() === a && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === dia;
-}
 
 function parseValor(v) {
   let t = s(v).replace(/[^\d,.-]/g, '');
