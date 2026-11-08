@@ -1,80 +1,72 @@
-# Portal de Acompanhamento de O.S. — Firestore + GitHub Pages
+# Garage 1240 · Ordens de Serviço (v2)
 
-Site estático (`index.html` + `app.js`) que usa o **Firestore** (seu projeto Firebase)
-como banco de dados. Sem servidor próprio — dá pra hospedar de graça no GitHub Pages.
+Aplicativo interno da Garage 1240 para controlar equipamentos, serviços (inclusive terceirizados), valores e relatórios em PDF.
+Site estático (GitHub Pages) + Firebase (Firestore e login por e-mail/senha). Sem servidor próprio e sem custo.
 
-## Arquivos
+A versão do app aparece no rodapé da barra lateral. O histórico de mudanças está em [CHANGELOG.md](CHANGELOG.md).
 
-- `index.html` — página e estilo visual
-- `app.js` — toda a lógica (login por PIN/senha, telas, leitura/escrita no Firestore)
-- `firebase-config.js` — **você precisa preencher** com os dados do seu projeto Firebase
-- `firestore.rules` — regra de segurança do banco (cole no Console do Firebase)
+## Como usar no dia a dia
 
-## Passo 1 — Criar o projeto no Firebase
+- **Início:** busca (cliente, equipamento, nº de série ou O.S.), botão "Novo serviço" e a lista "Precisa de atenção".
+- **Serviço:** página única com etapas, relato do cliente, diagnóstico, ações, recomendações, terceirização, valores e histórico de alterações. "Gerar relatório (PDF)" cria o relatório para o cliente; ele nunca mostra custo do terceiro nem margem.
+- **Equipamentos e Clientes:** cadastro com aviso de duplicidade (o nº de série é a identidade do aparelho).
+- **Conferência:** aponta dados fora do padrão (duplicados, serviços sem equipamento, concluídos sem valor, datas inválidas).
+- **Celular:** funciona no navegador e pode ser instalado na tela inicial; a barra de navegação fica embaixo.
 
-1. Acesse https://console.firebase.google.com e crie um projeto novo (ex: `garage1240-os`).
-2. No menu lateral, vá em **Build > Firestore Database** → **Criar banco de dados** →
-   modo **produção** → escolha a região (ex: `southamerica-east1` para o Brasil).
-3. Ainda no menu lateral, vá em **Build > Authentication** → **Sign-in method** →
-   ative o provedor **Anônimo**. (O app usa isso só para autenticar o navegador antes
-   de ler/escrever no banco — o cliente/oficina continuam entrando por PIN/senha na tela.)
+## Entrar pela primeira vez / liberar o sócio
 
-## Passo 2 — Pegar as credenciais do app
+1. No Console do Firebase, **Authentication → Método de login**: ative **E-mail/senha** e desative **Anônimo**.
+2. **Authentication → Usuários → Adicionar usuário**: crie um usuário para cada pessoa (e-mail e senha). Copie o **UID** de cada um.
+3. **Firestore Database → Iniciar coleção** `usuarios`: crie um documento por pessoa, com o **ID igual ao UID**, e os campos `nome` (texto), `email` (texto) e `role` (texto: `admin`).
+   Sem esse documento, o login funciona, mas o app recusa o acesso e nada é lido ou gravado.
 
-1. No Console do Firebase, clique no ícone de engrenagem (⚙) → **Configurações do projeto**.
-2. Em **Seus apps**, clique em **Adicionar app > Web** (ícone `</>`), dê um nome e finalize.
-3. Copie o objeto `firebaseConfig` que aparece na tela.
-4. Cole no arquivo `firebase-config.js` (substituindo os valores de exemplo).
+## Publicar as regras de segurança
 
-Essas chaves **não são secretas** — é o padrão do Firebase para apps web. Quem protege
-os dados de verdade é a regra do Firestore (próximo passo), não essa chave.
-
-## Passo 3 — Aplicar as regras de segurança
-
-1. No Console do Firebase, vá em **Firestore Database > Regras**.
-2. Apague o conteúdo padrão e cole o conteúdo do arquivo `firestore.rules` deste projeto.
-3. Clique em **Publicar**.
-
-Isso garante que só quem passar pelo app (autenticação anônima) consegue ler ou
-escrever no banco — evita que alguém acesse os dados direto pela API do Firestore.
-
-## Passo 4 — Subir para o GitHub
-
-No terminal, dentro da pasta do projeto:
+As regras ficam em `firestore.rules` e `storage.rules`. Com a CLI do Firebase instalada e logada:
 
 ```bash
-git init
-git add .
-git commit -m "Portal de O.S. com Firestore"
-git branch -M main
-git remote add origin https://github.com/SEU-USUARIO/SEU-REPO.git
-git push -u origin main
+npx firebase deploy --only firestore:rules,storage
 ```
 
-(Troque `SEU-USUARIO/SEU-REPO` pelo repositório que você criar no GitHub.)
+Ou cole o conteúdo de cada arquivo em **Firestore → Regras** e **Storage → Regras** no Console.
+Teste as regras antes de publicar com `npm run test:rules` (usa o emulador local).
 
-## Passo 5 — Publicar com GitHub Pages
+## Rodar e testar no computador (sem tocar nos dados reais)
 
-1. No repositório, vá em **Settings > Pages**.
-2. Em **Source**, escolha **Deploy from a branch**.
-3. Branch: `main`, pasta: `/ (root)`. Salvar.
-4. Em alguns minutos o site fica disponível em:
-   `https://SEU-USUARIO.github.io/SEU-REPO/`
+```bash
+npm install
+npm test                  # testes das regras de negócio, migração e PDF
+npm run test:rules        # regras de segurança e gravação com log (emulador do Firebase)
+```
 
-## Acessos padrão (trocar depois de publicar)
+Para abrir o app com dados de teste:
 
-- **PIN do cliente "Stage Audio Visual":** `2026`
-- **Senha da oficina (admin):** `garage1240`
+```bash
+npx firebase emulators:start --only firestore,auth --project demo-os-garage
+node scripts/dev-seed.mjs     # em outro terminal: cria dev@teste.com / senha123 e carrega os dados do backup
+node scripts/serve.mjs 5173   # em outro terminal
+```
 
-Ambos podem ser trocados direto pelo painel administrativo (abas **Clientes** e
-**Configurações**) — fica salvo no Firestore, não precisa mexer no código.
+Abra `http://localhost:5173/?emulador`. O `?emulador` faz o app usar só os emuladores locais.
 
-## Sobre segurança
+## Backup e migração dos dados antigos
 
-Isso continua sendo um app **client-side** (sem servidor próprio): a regra do
-Firestore bloqueia acesso de fora do app, mas alguém que abrir o código-fonte do site
-(F12 no navegador) tecnicamente consegue ver como os dados são lidos e, com esforço,
-replicar chamadas ao Firestore. Para o que você está usando (rastrear status de
-equipamento, sem dado financeiro/pessoal sensível), esse nível é adequado. Se um dia
-quiser autenticação mais forte (login de verdade por e-mail/senha em vez de PIN
-compartilhado, por exemplo), é uma evolução natural a partir daqui.
+```bash
+node scripts/backup.mjs                  # só funciona enquanto as regras antigas estiverem ativas
+node scripts/migrate.mjs                 # ENSAIO: mostra o que seria migrado e grava pendencias.json
+OS_EMAIL=... OS_SENHA=... node scripts/migrate.mjs --aplicar   # grava no Firestore (use o login do dono)
+```
+
+A pasta `backup/` fica fora do git de propósito: contém PINs e senhas em texto puro do sistema antigo.
+
+## Estrutura
+
+- `src/domain/` regras de negócio puras (testadas): status, série, validação, margem, prazos, log, painel, conferência.
+- `src/data/` acesso ao Firestore: `repo.js` grava o documento **e** o log na mesma transação.
+- `src/views/` telas. `src/pdf/` conteúdo e desenho do relatório.
+- `src/migration/` transformação dos dados do sistema antigo.
+- `css/`, `index.html`, `manifest.webmanifest`, `sw.js`: interface e instalação no celular.
+
+## Versões
+
+Formato `v2.X.Y`: correção pequena sobe o último número; função nova sobe o do meio; mudança grande no jeito de guardar os dados sobe o primeiro. Cada versão ganha uma tag no git (`v2.0.1`) e uma entrada no CHANGELOG.
