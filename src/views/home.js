@@ -37,7 +37,11 @@ function desenharBusca(navigate) {
     ? lista.map((r, i) => `<button class="resultado" data-i="${i}"><span class="res-tipo">${{ servico: 'O.S.', equipamento: 'Equip.', cliente: 'Cliente' }[r.tipo]}</span>
         <span class="res-txt"><b>${esc(r.titulo)}</b><small>${esc(r.detalhe)}</small></span></button>`).join('')
     : '<div class="resultado-vazio">Nada encontrado.</div>';
-  alvo.querySelectorAll('[data-i]').forEach((b) => (b.onclick = () => navigate(lista[Number(b.dataset.i)].rota)));
+  alvo.querySelectorAll('[data-i]').forEach((b) => (b.onclick = async () => {
+    const r = lista[Number(b.dataset.i)];
+    if (r.tipo === 'equipamento') (await import('./equipamentos.js')).definirBusca(r.busca);
+    navigate(r.rota);
+  }));
 }
 
 function desenharPainel(navigate) {

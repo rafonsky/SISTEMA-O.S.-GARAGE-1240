@@ -26,12 +26,18 @@ if (!aplicar) {
 
 const { initializeApp } = await import('firebase/app');
 const { getAuth, signInWithEmailAndPassword } = await import('firebase/auth');
-const { getFirestore, writeBatch, doc } = await import('firebase/firestore');
+const { getFirestore, writeBatch, doc, getDoc, getDocs, collection } = await import('firebase/firestore');
 const { firebaseConfig } = await import('../firebase-config.js');
 
 const app = initializeApp(firebaseConfig);
 const cred = await signInWithEmailAndPassword(getAuth(app), process.env.OS_EMAIL, process.env.OS_SENHA);
 const db = getFirestore(app);
+// Segurança: não sobrescreve dados que já estão em uso no sistema novo.
+const jaTem = (await getDocs(collection(db, 'servicos'))).size;
+if (jaTem > 0 && !args.includes('--forcar')) {
+  console.error(`Abortado: já existem ${jaTem} serviço(s) no Firestore. Rodar a migração de novo sobrescreveria edições. Use --forcar só se tiver certeza.`);
+  process.exit(1);
+}
 const usuario = { uid: cred.user.uid, nome: 'Migração v2.0.0' };
 const agora = new Date().toISOString();
 
@@ -50,7 +56,8 @@ for (let i = 0; i < itens.length; i += 200) {
   await batch.commit();
 }
 // O próximo número de O.S. continua depois do maior já usado.
-const maior = Math.max(0, ...resultado.servicos.map((s) => parseInt(s.id.replace(/\D/g, ''), 10) || 0));
+const atual = (await getDoc(doc(db, 'config', 'counters'))).data()?.nextOs ?? 0;
+const maior = Math.max(atual, 0, ...resultado.servicos.map((s) => parseInt(s.id.replace(/\D/g, ''), 10) || 0));
 const contador = writeBatch(db);
 contador.set(doc(db, 'config', 'counters'), { nextOs: maior }, { merge: true });
 await contador.commit();

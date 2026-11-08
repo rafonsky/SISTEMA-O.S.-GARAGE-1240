@@ -61,3 +61,15 @@ test('data inválida em qualquer campo de data', () => {
   d.servicos[0].previsaoEntrega = '2026-02-31';
   assert.deepEqual(tipos(d), ['data-invalida']);
 });
+
+test('FINAL: mesmo nome com patrimônios diferentes não é duplicata; mesmo nome e mesmo patrimônio é', () => {
+  const d = limpo();
+  d.equipamentos = [
+    { id: 'a', clienteId: 'c1', nome: 'Dell G15', tipo: 'informatica', serie: '', patrimonio: '02' },
+    { id: 'b', clienteId: 'c1', nome: 'Dell G15', tipo: 'informatica', serie: '', patrimonio: '03' },
+    { id: 'c', clienteId: 'c1', nome: 'dell g15', tipo: 'informatica', serie: '', patrimonio: '03' },
+  ];
+  d.servicos = [];
+  const dups = findInconsistencias(d).filter((i) => i.tipo === 'equipamento-duplicado').map((i) => i.id);
+  assert.deepEqual(dups, ['c']);
+});

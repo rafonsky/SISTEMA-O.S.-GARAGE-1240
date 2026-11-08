@@ -113,3 +113,9 @@ test('buildLogEntry de exclusão não deixa undefined', () => {
   const e = buildLogEntry({ entidade: 'clientes', entidadeId: 'c1', acao: 'excluir', antes: { nome: 'X' }, depois: null, usuario: { uid: 'u', nome: 'R' }, agora: '2026-11-08T10:00:00.000Z' });
   assert.deepEqual(e.mudancas, [{ campo: 'nome', antes: 'X', depois: null }]);
 });
+
+test('FINAL: terceiro que já devolveu o aparelho não gera alerta de prazo', () => {
+  const t = { enviadoEm: '2026-01-01', prazoDias: 30, devolvidoEm: '2026-01-20' };
+  assert.equal(diasRestantes(t, '2026-11-08'), null);
+  assert.equal(precisaAtencao({ status: 'Em andamento', terceiro: t }, '2026-11-08'), null);
+});

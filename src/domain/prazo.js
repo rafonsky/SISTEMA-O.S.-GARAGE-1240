@@ -12,7 +12,7 @@ export function diffDias(de, ate) {
 }
 
 export function diasRestantes(terceiro, hoje) {
-  if (!terceiro?.enviadoEm || !terceiro?.prazoDias) return null;
+  if (!terceiro?.enviadoEm || !terceiro?.prazoDias || terceiro.devolvidoEm) return null; // já devolveu: sem alerta
   return Number(terceiro.prazoDias) - diffDias(terceiro.enviadoEm, hoje);
 }
 

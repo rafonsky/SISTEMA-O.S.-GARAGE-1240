@@ -9,6 +9,13 @@ const RESERVA_RODAPE = 34;
 const AMBAR = [185, 116, 10];
 const CINZA = [110, 110, 110];
 
+// Quebra o texto (em negrito, 11 pt) em linhas que cabem na largura da coluna.
+export function linhasDaColuna(doc, valor, largura) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  return doc.splitTextToSize(String(valor), largura);
+}
+
 export function renderRelatorioPDF(modelo, { jsPDF, logoDataUrl } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   let y = 14;
@@ -43,15 +50,18 @@ export function renderRelatorioPDF(modelo, { jsPDF, logoDataUrl } = {}) {
 
   /* ---- cliente / período / status ---- */
   const colunas = [
-    ['CLIENTE', modelo.cliente.nome, MARGEM],
-    ['PERÍODO DO SERVIÇO', modelo.periodo, MARGEM + 78],
-    ['STATUS', modelo.status, MARGEM + 135],
+    ['CLIENTE', modelo.cliente.nome, MARGEM, 72],
+    ['PERÍODO DO SERVIÇO', modelo.periodo, MARGEM + 78, 51],
+    ['STATUS', modelo.status, MARGEM + 135, DIREITA - (MARGEM + 135)],
   ];
-  for (const [rotulo, valor, x] of colunas) {
+  let maisLinhas = 1;
+  for (const [rotulo, valor, x, largura] of colunas) {
     texto(rotulo, x, y, { tamanho: 7.5, cor: CINZA });
-    texto(String(valor), x, y + 5.5, { tamanho: 11, negrito: true });
+    const linhas = linhasDaColuna(doc, valor, largura);
+    maisLinhas = Math.max(maisLinhas, linhas.length);
+    linhas.forEach((l, i) => texto(l, x, y + 5.5 + i * 5, { tamanho: 11, negrito: true }));
   }
-  y += 14;
+  y += 9 + maisLinhas * 5;
 
   /* ---- equipamento ---- */
   const linhasSpecs = modelo.equipamento.linhaSpecs ? doc.splitTextToSize(modelo.equipamento.linhaSpecs, DIREITA - MARGEM - 8) : [];

@@ -72,13 +72,22 @@ export function createRepo({ db, getUsuario }) {
         // No Firestore, todas as leituras da transação vêm antes de qualquer escrita.
         let id = s.id;
         let proximo = null;
+        let existente;
         if (!id) {
+          // Se o contador ficou para trás de uma O.S. que já existe, pula para o próximo número livre.
           const c = await tx.get(counterRef);
           proximo = (c.exists() ? c.data().nextOs ?? 0 : 0) + 1;
-          id = formatarOs(proximo);
+          for (let tentativa = 0; tentativa < 200; tentativa++) {
+            id = formatarOs(proximo);
+            existente = await tx.get(doc(db, 'servicos', id));
+            if (!existente.exists()) break;
+            proximo += 1;
+          }
+          if (existente.exists()) throw new Error('Não foi possível reservar um número de O.S. livre.');
+        } else {
+          existente = await tx.get(doc(db, 'servicos', id));
         }
         const ref = doc(db, 'servicos', id);
-        const existente = await tx.get(ref);
         const antes = existente.exists() ? existente.data() : null;
         if (proximo !== null) tx.set(counterRef, { nextOs: proximo }, { merge: true });
         const objeto = limpar({ ...s, id });

@@ -84,3 +84,15 @@ test('excluir serviço registra log "excluir" com o conteúdo anterior', async (
   assert.equal(ex.entidadeId, salvo.id);
   assert.ok(ex.mudancas.some((m) => m.campo === 'status' && m.antes === 'Recebido' && m.depois === null));
 });
+
+test('FINAL: contador atrasado não sobrescreve uma O.S. que já existe', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const d = ctx.firestore();
+    await d.doc('servicos/OS-0001').set({ id: 'OS-0001', relatoCliente: 'ORIGINAL', status: 'Recebido' });
+    await d.doc('config/counters').set({ nextOs: 0 });
+  });
+  const novo = await repo.saveServico(servicoBase());
+  assert.equal(novo.id, 'OS-0002');
+  const original = await getDoc(doc(db, 'servicos/OS-0001'));
+  assert.equal(original.data().relatoCliente, 'ORIGINAL');
+});

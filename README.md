@@ -20,6 +20,10 @@ A versão do app aparece no rodapé da barra lateral. O histórico de mudanças 
 3. **Firestore Database → Iniciar coleção** `usuarios`: crie um documento por pessoa, com o **ID igual ao UID**, e os campos `nome` (texto), `email` (texto) e `role` (texto: `admin`).
    Sem esse documento, o login funciona, mas o app recusa o acesso e nada é lido ou gravado.
 
+## Ordem de publicação (importante)
+
+O site no GitHub Pages passa a usar o código novo assim que a branch `main` é atualizada. Portanto, **antes** de fazer o merge em `main`: (1) crie os usuários e os documentos `usuarios/`, (2) publique as regras novas, (3) rode a migração. Enquanto as regras antigas estiverem ativas, os dados do sistema anterior (PINs, senhas dos técnicos, CPF/CNPJ) continuam acessíveis a qualquer visitante.
+
 ## Publicar as regras de segurança
 
 As regras ficam em `firestore.rules` e `storage.rules`. Com a CLI do Firebase instalada e logada:

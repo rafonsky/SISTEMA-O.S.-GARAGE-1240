@@ -1,5 +1,6 @@
 import { store, repo, equipById, clienteById } from '../data/store.js';
-import { esc, toast, openModal, closeModal, confirmar, semAcento } from '../ui.js';
+import { esc, toast, openModal, closeModal, confirmar, semAcento, fmtData } from '../ui.js';
+import { formatBRL } from '../domain/finance.js';
 import { specsLinha, rotuloTipo } from '../domain/equipamento.js';
 import { findDuplicateEquip } from '../domain/validators.js';
 import { normalizeSerial } from '../domain/serial.js';
@@ -7,6 +8,13 @@ import { TIPOS_EQUIPAMENTO } from '../domain/status.js';
 import { abrirFormCliente } from './clientes.js';
 
 const filtros = { q: '', cliente: '', tipo: '' };
+
+// Usada pela busca da tela inicial: abre a lista já filtrada pelo aparelho.
+export function definirBusca(texto) {
+  filtros.q = texto;
+  filtros.cliente = '';
+  filtros.tipo = '';
+}
 
 export async function render(container, { navigate }) {
   const clientes = [...store.clientes].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -56,7 +64,7 @@ function desenharTabela(navigate) {
         <td data-label="Cliente">${esc(clienteById(e.clienteId)?.nome ?? '—')}</td>
         <td data-label="Série"><span class="pin-code">${esc(e.serie) || '—'}</span></td>
         <td data-label="Patrimônio">${esc(e.patrimonio) || '—'}</td>
-        <td data-label="Serviços">${n}</td>
+        <td data-label="Serviços">${n ? `<button class="row-btn" data-historico="${esc(e.id)}">${n}</button>` : '0'}</td>
         <td data-label="">
           <button class="row-btn" data-editar="${esc(e.id)}">Editar</button>
           <button class="row-btn" data-novo-servico="${esc(e.id)}">+ Serviço</button>
@@ -66,7 +74,20 @@ function desenharTabela(navigate) {
     }).join('')}</tbody></table>`;
   alvo.querySelectorAll('[data-editar]').forEach((b) => (b.onclick = () => abrirFormEquipamento(b.dataset.editar)));
   alvo.querySelectorAll('[data-novo-servico]').forEach((b) => (b.onclick = () => navigate(`servico/novo?equip=${encodeURIComponent(b.dataset.novoServico)}`)));
+  alvo.querySelectorAll('[data-historico]').forEach((b) => (b.onclick = () => abrirHistorico(b.dataset.historico, navigate)));
   alvo.querySelectorAll('[data-excluir]').forEach((b) => (b.onclick = () => excluir(b.dataset.excluir)));
+}
+
+function abrirHistorico(id, navigate) {
+  const e = equipById(id);
+  const lista = store.servicos.filter((s) => s.equipamentoId === id).sort((a, b) => String(b.dataEntrada ?? '').localeCompare(String(a.dataEntrada ?? '')));
+  const m = openModal(`
+    <h3>Histórico · ${esc(e.nome)}</h3>
+    ${lista.map((s) => `<button class="resultado" data-os="${esc(s.id)}"><span class="res-tipo">${esc(s.id)}</span>
+      <span class="res-txt"><b>${esc(s.status)}</b><small>${esc(fmtData(s.dataEntrada))}${s.valorCobrado ? ` · ${esc(formatBRL(s.valorCobrado))}` : ''} — ${esc((s.relatoCliente ?? '').slice(0, 70))}</small></span></button>`).join('')}
+    <div class="modal-actions"><button class="btn-secondary" id="hist-fechar">Fechar</button></div>`);
+  m.querySelector('#hist-fechar').onclick = closeModal;
+  m.querySelectorAll('[data-os]').forEach((b) => (b.onclick = () => { closeModal(); navigate(`servico/${b.dataset.os}`); }));
 }
 
 async function excluir(id) {

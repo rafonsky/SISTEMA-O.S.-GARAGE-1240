@@ -48,3 +48,8 @@ test('buscarGlobal com texto vazio devolve lista vazia e respeita o limite', () 
   assert.deepEqual(buscarGlobal(dados(), '  '), []);
   assert.equal(buscarGlobal(dados(), 'o', 2).length, 2);
 });
+
+test('FINAL: buscar pela série do aparelho também acha os serviços dele', () => {
+  const r = buscarGlobal(dados(), 'abc123');
+  assert.ok(r.some((x) => x.tipo === 'servico' && x.id === 'OS-0001'));
+});

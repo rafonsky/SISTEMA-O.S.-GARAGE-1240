@@ -1,4 +1,4 @@
-import { store, repo, servicoById, equipById, clienteById, subscribeLogDe } from '../data/store.js';
+import { store, repo, guardarLocal, servicoById, equipById, clienteById, subscribeLogDe } from '../data/store.js';
 import { esc, toast, confirmar, fmtData, hojeStr } from '../ui.js';
 import { STATUS_LIST, ETAPAS } from '../domain/status.js';
 import { calcMargem, formatBRL } from '../domain/finance.js';
@@ -216,6 +216,7 @@ export async function render(container, { param, navigate }) {
     botao.disabled = true;
     try {
       const salvo = await repo.saveServico(dados);
+      guardarLocal('servicos', salvo);
       toast(novo ? `Serviço ${salvo.id} criado.` : 'Serviço salvo.');
       if (novo) navigate(`servico/${salvo.id}`);
       else {

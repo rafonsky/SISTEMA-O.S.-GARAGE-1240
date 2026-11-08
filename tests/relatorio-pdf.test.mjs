@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { jsPDF } from 'jspdf';
 import { buildRelatorioModel } from '../src/pdf/modelo.js';
-import { renderRelatorioPDF } from '../src/pdf/render.js';
+import { renderRelatorioPDF, linhasDaColuna } from '../src/pdf/render.js';
 
 const base = {
   servico: {
@@ -31,4 +31,12 @@ test('relatório sem valor, sem garantia e sem seções opcionais não quebra', 
   const minimo = { ...base, servico: { id: 'OS-0001', status: 'Recebido', relatoCliente: 'Não liga.', acoes: [], recomendacoes: [], dataEntrada: '2026-11-01' } };
   const doc = renderRelatorioPDF(buildRelatorioModel(minimo), { jsPDF });
   assert.equal(doc.getNumberOfPages(), 1);
+});
+
+test('FINAL: status longo quebra em linhas que cabem na coluna', () => {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const linhas = linhasDaColuna(doc, 'Sem conserto – devolvido ao cliente', 55);
+  assert.ok(linhas.length >= 2);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+  assert.ok(linhas.every((l) => doc.getTextWidth(l) <= 55));
 });

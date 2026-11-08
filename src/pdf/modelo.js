@@ -5,6 +5,10 @@ import { specsLinha } from '../domain/equipamento.js';
 
 export const CONTATO = 'Rafael / Eduardo · (41) 9131-2064 · garage1240.oficial@gmail.com';
 
+// O cliente não precisa saber que o aparelho está com um terceiro.
+const STATUS_PARA_CLIENTE = { 'No terceiro': 'Em andamento' };
+export const statusParaCliente = (status) => STATUS_PARA_CLIENTE[status] ?? status;
+
 const temValor = (v) => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
 const moeda = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/ /g, ' ');
 
@@ -25,7 +29,7 @@ export function buildRelatorioModel({ servico: s, equipamento, cliente, hoje }) 
     dataEmissao: fmtData(hoje),
     cliente: { nome: cliente?.nome ?? '—' },
     periodo: periodoTexto(s.dataInicio || s.dataEntrada, s.dataConclusao),
-    status: s.status,
+    status: statusParaCliente(s.status),
     equipamento: { nome: equipamento?.nome ?? '—', linhaSpecs: specsLinha(equipamento) },
     secoes,
     garantiaTexto,

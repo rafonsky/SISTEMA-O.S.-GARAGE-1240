@@ -28,15 +28,17 @@ export function buscarGlobal({ clientes, equipamentos, servicos }, texto, limite
   const nomeEquip = (id) => equipamentos.find((e) => e.id === id)?.nome ?? '';
   const resultados = [];
 
+  const serieDe = (id) => equipamentos.find((e) => e.id === id)?.serieNorm ?? '';
   for (const s of servicos) {
-    if (semAcento(`${s.id} ${nomeEquip(s.equipamentoId)} ${nomeCliente(s.clienteId)}`).includes(q)) {
+    const achouSerie = qSerie && serieDe(s.equipamentoId).includes(qSerie);
+    if (achouSerie || semAcento(`${s.id} ${nomeEquip(s.equipamentoId)} ${nomeCliente(s.clienteId)}`).includes(q)) {
       resultados.push({ tipo: 'servico', id: s.id, titulo: `${s.id} · ${nomeEquip(s.equipamentoId)}`, detalhe: `${nomeCliente(s.clienteId)} · ${s.status}`, rota: `servico/${s.id}` });
     }
   }
   for (const e of equipamentos) {
     const texto2 = semAcento(`${e.nome} ${e.serie ?? ''} ${e.patrimonio ?? ''} ${e.marca ?? ''} ${e.modelo ?? ''} ${nomeCliente(e.clienteId)}`);
     if (texto2.includes(q) || (qSerie && (e.serieNorm ?? '').includes(qSerie))) {
-      resultados.push({ tipo: 'equipamento', id: e.id, titulo: e.nome, detalhe: `${nomeCliente(e.clienteId)}${e.serie ? ` · série ${e.serie}` : ''}`, rota: 'equipamentos' });
+      resultados.push({ tipo: 'equipamento', id: e.id, titulo: e.nome, detalhe: `${nomeCliente(e.clienteId)}${e.serie ? ` · série ${e.serie}` : ''}`, rota: 'equipamentos', busca: e.serie || e.nome });
     }
   }
   for (const c of clientes) {
@@ -44,5 +46,6 @@ export function buscarGlobal({ clientes, equipamentos, servicos }, texto, limite
       resultados.push({ tipo: 'cliente', id: c.id, titulo: c.nome, detalhe: 'Cliente', rota: 'clientes' });
     }
   }
-  return resultados.slice(0, limite);
+  const ordem = { equipamento: 0, servico: 1, cliente: 2 }; // o aparelho primeiro, depois os serviços dele
+  return resultados.sort((a, b) => ordem[a.tipo] - ordem[b.tipo]).slice(0, limite);
 }

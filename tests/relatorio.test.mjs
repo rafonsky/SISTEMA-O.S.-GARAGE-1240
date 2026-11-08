@@ -72,3 +72,9 @@ test('sem valor cobrado o relatório não mostra valor', () => {
   const m = buildRelatorioModel({ ...acer, servico: { ...acer.servico, valorCobrado: null } });
   assert.equal(m.valor, null);
 });
+
+test('FINAL: status interno "No terceiro" aparece ao cliente como "Em andamento"', () => {
+  const m = buildRelatorioModel({ ...pc, servico: { ...pc.servico, status: 'No terceiro' } });
+  assert.equal(m.status, 'Em andamento');
+  assert.doesNotMatch(JSON.stringify(m), /terceiro/i);
+});

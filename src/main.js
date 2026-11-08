@@ -74,11 +74,19 @@ function montarCasca() {
           <div class="side-version">v${APP_VERSION}</div>
         </div>
       </nav>
-      <main class="main-area"><div class="content" id="view"></div></main>
+      <main class="main-area">
+        <div class="topo-mobile">
+          <span class="topo-marca">GARAGE 1240 <small>v${APP_VERSION}</small></span>
+          <span class="topo-acoes"><button class="btn-ghost" id="btn-tema-m" aria-label="Alternar tema">${tema === 'dark' ? 'Claro' : 'Escuro'}</button><button class="btn-ghost" id="btn-sair-m">Sair</button></span>
+        </div>
+        <div class="content" id="view"></div>
+      </main>
     </div>`;
   $app.querySelectorAll('[data-rota]').forEach((b) => (b.onclick = () => navigate(b.dataset.rota)));
   document.getElementById('btn-tema').onclick = alternarTema;
   document.getElementById('btn-sair').onclick = () => signOut();
+  document.getElementById('btn-tema-m').onclick = alternarTema;
+  document.getElementById('btn-sair-m').onclick = () => signOut();
   mostrarRota();
 }
 
@@ -96,7 +104,10 @@ async function mostrarRota() {
   } catch (e) {
     moduloAtual = null;
     console.error(e);
-    view.innerHTML = `<div class="empty">Não foi possível abrir esta tela.<br><small>${esc(e.message)}</small></div>`;
+    const semAcesso = e.code === 'permission-denied';
+    view.innerHTML = `<div class="empty">${semAcesso
+      ? 'Sem permissão para ler os dados. Confira se seu usuário foi liberado e se as regras do Firebase foram publicadas.'
+      : 'Não foi possível abrir esta tela. Verifique a conexão e tente de novo.'}<br><small>${esc(e.message)}</small></div>`;
   }
   atualizarBadge();
 }

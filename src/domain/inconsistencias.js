@@ -35,7 +35,7 @@ export function findInconsistencias({ clientes, equipamentos, servicos }) {
   for (const e of equipamentos) {
     if (!clienteIds.has(e.clienteId)) add('equipamento-sem-cliente', e.id, `${e.nome} aponta para um cliente que não existe.`);
     const serie = normalizeSerial(e.serie);
-    const chave = `${e.clienteId}|${serie ? `s:${serie}` : `n:${normalizeNome(e.nome)}`}`;
+    const chave = `${e.clienteId}|${serie ? `s:${serie}` : `n:${normalizeNome(e.nome)}|p:${normalizeNome(e.patrimonio)}`}`;
     if (vistos.has(chave)) {
       add('equipamento-duplicado', e.id, `${e.nome} parece repetido (já existe ${vistos.get(chave).nome}).`);
     } else {
