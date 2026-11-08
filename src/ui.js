@@ -61,6 +61,4 @@ export function confirmar(titulo, texto, rotulo = 'Confirmar', perigo = false) {
   });
 }
 
-export function semAcento(s) {
-  return String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-}
+export { semAcento } from './domain/serial.js';
