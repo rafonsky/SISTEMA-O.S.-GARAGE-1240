@@ -1,10 +1,30 @@
 rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    // Mesmo princípio do firestore.rules: só quem passou pelo app (autenticação
-    // anônima) pode enviar/ler fotos.
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Membro = pessoa logada (e-mail/senha) que tem um documento em usuarios/{uid}.
+    // Esse documento só é criado pelo dono (script ou Console), nunca pelo app.
+    function membro() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
     }
+
+    match /usuarios/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /clientes/{id}      { allow read, write: if membro(); }
+    match /equipamentos/{id}  { allow read, write: if membro(); }
+    match /servicos/{id}      { allow read, write: if membro(); }
+    match /config/counters    { allow read, write: if membro(); }
+
+    // Log de alterações: só cria e lê. Nunca altera nem apaga.
+    match /log/{id} {
+      allow read, create: if membro();
+      allow update, delete: if false;
+    }
+
+    // Todo o resto (ordens, tecnicos, config/auth, etc.) fica fechado.
   }
 }
