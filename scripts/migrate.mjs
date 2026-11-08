@@ -49,5 +49,10 @@ for (let i = 0; i < itens.length; i += 200) {
   }
   await batch.commit();
 }
-console.log(`Gravados ${itens.length} documentos (e um log para cada).`);
+// O próximo número de O.S. continua depois do maior já usado.
+const maior = Math.max(0, ...resultado.servicos.map((s) => parseInt(s.id.replace(/\D/g, ''), 10) || 0));
+const contador = writeBatch(db);
+contador.set(doc(db, 'config', 'counters'), { nextOs: maior }, { merge: true });
+await contador.commit();
+console.log(`Gravados ${itens.length} documentos (e um log para cada). Próxima O.S.: OS-${String(maior + 1).padStart(4, '0')}.`);
 process.exit(0);
