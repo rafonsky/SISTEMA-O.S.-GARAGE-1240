@@ -1,0 +1,13 @@
+{
+  "name": "Garage 1240 · O.S.",
+  "short_name": "Garage 1240",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#12161D",
+  "theme_color": "#12161D",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "assets/icon-nav.png", "sizes": "192x192", "type": "image/png", "purpose": "any" }
+  ]
+}

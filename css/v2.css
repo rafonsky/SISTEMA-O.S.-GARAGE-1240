@@ -1,0 +1,28 @@
+/* Ajustes e componentes da v2 (somam-se ao app.css herdado do sistema anterior). */
+
+.link-btn{ background:none; border:none; color:var(--amber); font-size:12px; font-weight:600; cursor:pointer; padding:0; }
+.side-item span:first-of-type{ flex:1; }
+.side-badge:not(:empty){
+  background:var(--danger); color:#fff; font-size:11px; font-weight:700; min-width:20px; height:20px;
+  border-radius:10px; display:inline-flex; align-items:center; justify-content:center; padding:0 6px;
+}
+.side-version{ margin-top:10px; text-align:center; font-family:var(--font-mono); font-size:11px; color:var(--text-dim); }
+.side-nav{ flex:1; }
+.sidebar{ position:sticky; top:0; height:100vh; }
+
+/* Celular: a navegação vira barra fixa embaixo. */
+@media (max-width:820px){
+  .app-shell{ flex-direction:column; }
+  .sidebar{
+    position:fixed; bottom:0; left:0; right:0; top:auto; height:auto; width:100%; z-index:30;
+    flex-direction:row; padding:6px 8px calc(6px + env(safe-area-inset-bottom)); overflow-x:visible;
+    border-right:none; border-top:1px solid var(--line); border-bottom:none;
+  }
+  .side-brand, .side-foot{ display:none; }
+  .side-nav{ flex-direction:row; width:100%; justify-content:space-around; gap:0; }
+  .side-item{ flex-direction:column; gap:3px; padding:6px 4px; font-size:11px; width:auto; flex:1; position:relative; align-items:center; text-align:center; }
+  .side-item span:first-of-type{ flex:none; }
+  .side-badge:not(:empty){ position:absolute; top:0; right:18%; }
+  .main-area{ padding-bottom:84px; }
+  .content{ padding:18px 14px 30px; }
+}
