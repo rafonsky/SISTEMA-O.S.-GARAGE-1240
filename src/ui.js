@@ -5,17 +5,7 @@ export function esc(v) {
   return String(v).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 }
 
-export function hojeStr() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
-export function fmtData(d) {
-  if (!d) return '—';
-  const [a, m, dia] = String(d).split('-');
-  return a && m && dia ? `${dia}/${m}/${a}` : d;
-}
+export { hojeStr, fmtData } from './domain/datas.js';
 
 export function toast(msg) {
   let t = document.getElementById('toast');
