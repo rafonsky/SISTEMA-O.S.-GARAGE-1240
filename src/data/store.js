@@ -12,10 +12,20 @@ export const clienteById = (id) => store.clientes.find((c) => c.id === id) ?? nu
 export const equipById = (id) => store.equipamentos.find((e) => e.id === id) ?? null;
 export const servicoById = (id) => store.servicos.find((s) => s.id === id) ?? null;
 
+let resolverPronto;
+let pronto = new Promise((r) => { resolverPronto = r; });
+
+// Resolve quando a primeira carga de todas as coleções chegou (evita telas "não encontrado" ao recarregar).
+export const aguardarDados = () => pronto;
+
 export function subscribeAll(onChange) {
+  pronto = new Promise((r) => { resolverPronto = r; });
+  const carregadas = new Set();
   const paradas = Object.keys(store).map((nome) =>
     onSnapshot(collection(db, nome), (snap) => {
       store[nome] = snap.docs.map((d) => d.data());
+      carregadas.add(nome);
+      if (carregadas.size === Object.keys(store).length) resolverPronto();
       onChange(nome);
     })
   );

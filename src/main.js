@@ -1,5 +1,5 @@
 import { onUser, signOut } from './auth.js';
-import { store, subscribeAll } from './data/store.js';
+import { store, subscribeAll, aguardarDados } from './data/store.js';
 import { renderLogin } from './views/login.js';
 import { APP_VERSION } from './version.js';
 import { esc } from './ui.js';
@@ -87,7 +87,10 @@ async function mostrarRota() {
   $app.querySelectorAll('[data-rota]').forEach((b) => b.classList.toggle('active', b.dataset.rota === nome));
   const view = document.getElementById('view');
   if (!view) return;
+  view.innerHTML = '<div class="empty" style="border:none;">Carregando…</div>';
   try {
+    await aguardarDados();
+    if (document.getElementById('view') !== view) return; // a tela mudou enquanto carregava
     moduloAtual = await import(ROTAS[nome].arquivo);
     await moduloAtual.render(view, { param, navigate });
   } catch (e) {
