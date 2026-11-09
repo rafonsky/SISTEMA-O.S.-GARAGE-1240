@@ -4,8 +4,9 @@ import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator, doc, getDoc, getDocs, collection } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator, doc, getDoc, getDocs, collection, terminate } from 'firebase/firestore';
 import { createRepo } from '../../src/data/repo.js';
+import { limparFirestore } from './helpers.mjs';
 
 let env, db, repo, uid;
 
@@ -25,12 +26,13 @@ before(async () => {
 });
 
 after(async () => {
+  await terminate(db); // fecha os streams gRPC para não deixar o emulador com chamadas penduradas
   await env.cleanup();
   process.exit(0);
 });
 
 beforeEach(async () => {
-  await env.clearFirestore();
+  await limparFirestore(env);
   await env.withSecurityRulesDisabled(async (ctx) => {
     await ctx.firestore().doc(`usuarios/${uid}`).set({ nome: 'Rafael', role: 'admin' });
   });

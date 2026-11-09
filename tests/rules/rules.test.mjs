@@ -2,6 +2,8 @@ import test, { before, after, beforeEach } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 
+import { limparFirestore } from './helpers.mjs';
+
 let env;
 
 before(async () => {
@@ -16,7 +18,7 @@ after(async () => {
 });
 
 beforeEach(async () => {
-  await env.clearFirestore();
+  await limparFirestore(env);
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await db.doc('usuarios/membro').set({ nome: 'Rafael', email: 'r@x.com', role: 'admin' });
