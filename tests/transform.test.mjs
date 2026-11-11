@@ -69,6 +69,18 @@ test('item com "teste" no nome é migrado mas sinalizado', () => {
   assert.equal(get(r, 'possivel-teste').some((p) => p.id === 'e7'), true);
 });
 
+test('excluir: cliente e equipamento descartados saem, com os equipamentos do cliente, e ficam registrados', () => {
+  const dados = base();
+  dados.clientes.push({ id: 'cj', nome: 'jao do teste', pin: '0000' });
+  dados.equipamentos.push({ id: 'ej1', clienteId: 'cj', nome: 'DELL G15', tipo: 'Notebook', patrimonio: '' });
+  const r = transformBackup(dados, { excluir: { clientes: ['cj'], equipamentos: ['e7'] } });
+  assert.ok(!r.clientes.some((c) => c.id === 'cj'));
+  assert.ok(!r.equipamentos.some((x) => x.id === 'ej1' || x.id === 'e7'));
+  assert.ok(r.equipamentos.some((x) => x.id === 'e1'), 'os outros continuam');
+  assert.deepEqual(get(r, 'excluido').map((p) => p.id).sort(), ['cj', 'e7', 'ej1']);
+  assert.equal(get(r, 'possivel-teste').some((p) => p.id === 'e7' || p.id === 'cj'), false);
+});
+
 test('patrimônio "s/n" vira vazio', () => {
   assert.equal(transformBackup(base()).equipamentos.find((x) => x.id === 'e8').patrimonio, '');
 });

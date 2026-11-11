@@ -16,11 +16,22 @@ function parseValor(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-export function transformBackup({ clientes = [], equipamentos = [], ordens = [] }) {
+// excluir: itens que o dono mandou descartar (ficam só no backup). Os equipamentos de um cliente
+// descartado também saem. Tudo o que sai é registrado como pendência do tipo "excluido".
+export function transformBackup({ clientes = [], equipamentos = [], ordens = [] }, { excluir = {} } = {}) {
   const pendencias = [];
   const pend = (tipo, id, detalhe) => pendencias.push({ tipo, id, detalhe });
+  const clientesFora = new Set(excluir.clientes ?? []);
+  const equipFora = new Set(excluir.equipamentos ?? []);
 
-  const outClientes = clientes.map(({ pin, ...resto }) => resto);
+  clientes.filter((c) => clientesFora.has(c.id)).forEach((c) => pend('excluido', c.id, `Cliente "${s(c.nome)}" descartado a pedido; não foi migrado.`));
+  equipamentos = equipamentos.filter((e) => {
+    if (!clientesFora.has(e.clienteId) && !equipFora.has(e.id)) return true;
+    pend('excluido', e.id, `Equipamento "${s(e.nome)}" descartado a pedido; não foi migrado.`);
+    return false;
+  });
+
+  const outClientes = clientes.filter((c) => !clientesFora.has(c.id)).map(({ pin, ...resto }) => resto);
   outClientes.forEach((c) => {
     if (/\bteste\b/i.test(s(c.nome))) pend('possivel-teste', c.id, `Cliente "${c.nome}" parece ser de teste.`);
   });

@@ -2,8 +2,6 @@ import { signIn } from '../auth.js';
 import { esc } from '../ui.js';
 import { APP_VERSION } from '../version.js';
 
-const OLHO = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
-
 export function renderLogin($app, { aviso, alternarTema }) {
   $app.innerHTML = `
     <div class="login-wrap">
@@ -17,10 +15,10 @@ export function renderLogin($app, { aviso, alternarTema }) {
           <div class="field"><label for="l-email">E-mail</label>
             <input type="email" id="l-email" autocomplete="username" inputmode="email" style="font-family:var(--font-body);"></div>
           <div class="field"><label for="l-senha">Senha</label>
-            <div class="input-with-toggle">
-              <input type="password" id="l-senha" autocomplete="current-password" style="font-family:var(--font-body);">
-              <button type="button" class="toggle-visibility" id="l-olho" aria-label="Mostrar senha">${OLHO}</button>
-            </div>
+            <input type="password" id="l-senha" autocomplete="current-password" style="font-family:var(--font-body);">
+            <label class="mostrar-senha" for="l-mostrar" style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:14px; cursor:pointer;">
+              <input type="checkbox" id="l-mostrar" style="width:auto; margin:0;"> Mostrar senha
+            </label>
           </div>
           <button class="btn-primary" type="submit" id="l-entrar">Entrar</button>
           <div class="err" id="l-erro" role="alert">${esc(aviso)}</div>
@@ -31,9 +29,8 @@ export function renderLogin($app, { aviso, alternarTema }) {
       </form>
     </div>`;
   const erro = document.getElementById('l-erro');
-  document.getElementById('l-olho').onclick = () => {
-    const i = document.getElementById('l-senha');
-    i.type = i.type === 'password' ? 'text' : 'password';
+  document.getElementById('l-mostrar').onchange = (e) => {
+    document.getElementById('l-senha').type = e.target.checked ? 'text' : 'password';
   };
   document.getElementById('l-tema').onclick = alternarTema;
   document.getElementById('form-login').onsubmit = async (e) => {

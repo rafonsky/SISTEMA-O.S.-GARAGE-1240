@@ -11,7 +11,13 @@ const pastaArg = args.find((a) => !a.startsWith('--'));
 const pasta = pastaArg ?? `backup/${readdirSync('backup').sort().at(-1)}`;
 
 const ler = (nome) => JSON.parse(readFileSync(`${pasta}/${nome}.json`, 'utf8'));
-const resultado = transformBackup({ clientes: ler('clientes'), equipamentos: ler('equipamentos'), ordens: ler('ordens') });
+// Descartado a pedido do dono: o cliente "jao do teste" com todos os equipamentos dele,
+// e os dois equipamentos de teste do Stage ("teste" e "Del G15 (teste)"). Continuam só no backup.
+const EXCLUIR = { clientes: ['cli-dyxuyh'], equipamentos: ['eq-oswxnq', 'eq-qmtssu'] };
+const resultado = transformBackup(
+  { clientes: ler('clientes'), equipamentos: ler('equipamentos'), ordens: ler('ordens') },
+  { excluir: EXCLUIR },
+);
 
 writeFileSync(`${pasta}/pendencias.json`, JSON.stringify(resultado.pendencias, null, 2));
 const porTipo = resultado.pendencias.reduce((a, p) => ((a[p.tipo] = (a[p.tipo] ?? 0) + 1), a), {});
@@ -32,6 +38,15 @@ const { firebaseConfig } = await import('../firebase-config.js');
 const app = initializeApp(firebaseConfig);
 const cred = await signInWithEmailAndPassword(getAuth(app), process.env.OS_EMAIL, process.env.OS_SENHA);
 const db = getFirestore(app);
+// Diagnóstico: confirma que o login foi reconhecido como membro antes de gravar qualquer coisa.
+console.log(`Logado como ${cred.user.email} (uid ${cred.user.uid}).`);
+try {
+  const eu = await getDoc(doc(db, 'usuarios', cred.user.uid));
+  console.log(eu.exists() ? 'Documento usuarios/{uid} encontrado: você é membro.' : 'ATENÇÃO: não existe usuarios/{uid} para este login; as regras vão negar tudo.');
+} catch (e) {
+  console.error(`Falha ao ler usuarios/{uid}: ${e.code ?? e.message}`);
+  process.exit(1);
+}
 // Segurança: não sobrescreve dados que já estão em uso no sistema novo.
 const jaTem = (await getDocs(collection(db, 'servicos'))).size;
 if (jaTem > 0 && !args.includes('--forcar')) {
