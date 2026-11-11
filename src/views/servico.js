@@ -8,10 +8,18 @@ import { abrirFormEquipamento } from './equipamentos.js';
 import { resumoChecklist, itensPara, definirResposta, linkDaOs, enderecoSoDoComputador } from '../domain/checklist.js';
 import { ABAS, ROTULO_PAPEL, abaDaEtapa, abaInicial } from '../domain/papeis.js';
 import { currentUsuario } from '../auth.js';
+import { enviarFoto, apagarArquivo } from '../data/fotos.js';
+import { MAX_FOTOS, removerFoto } from '../domain/fotos.js';
 import { definirBusca as buscarEquipamento } from './equipamentos.js';
 import { definirBusca as buscarCliente } from './clientes.js';
 
 let pararLog = null;
+let atualizarFotosDeFora = null;
+
+// Chamada quando os dados mudam (por exemplo, uma foto chegou do celular): só atualiza a grade de fotos.
+export function update() {
+  atualizarFotosDeFora?.();
+}
 const FORMAS_PAGAMENTO = ['PIX', 'Dinheiro', 'Cartão de débito', 'Cartão de crédito', 'Transferência', 'Outra'];
 
 const LABELS = {
@@ -20,7 +28,7 @@ const LABELS = {
   dataConclusao: 'Conclusão', valorCobrado: 'Valor cobrado', pago: 'Pago', dataPagamento: 'Data do pagamento',
   garantiaDias: 'Garantia (dias)', garantiaObs: 'Condições da garantia', obs: 'Observação interna',
   senhaAcesso: 'Senha de acesso', formaPagamento: 'Forma de pagamento', tecnicoResponsavel: 'Responsável técnico', pecas: 'Peças necessárias', checklistObs: 'Conferência de entrada (observação)',
-  clienteId: 'Cliente', equipamentoId: 'Equipamento', 'terceiro.custo': 'Custo do terceiro', 'terceiro.nome': 'Terceiro',
+  fotos: 'Fotos', clienteId: 'Cliente', equipamentoId: 'Equipamento', 'terceiro.custo': 'Custo do terceiro', 'terceiro.nome': 'Terceiro',
 };
 
 // O gerador de QR só é baixado quando alguém pede o código.
@@ -106,6 +114,19 @@ export async function render(container, { param, navigate }) {
         <div class="field"><label>Relato do cliente <span class="hint-inline">(como ele descreveu — não é alterado pelo diagnóstico)</span></label>
           <textarea id="sv-relato" rows="3" ${F}>${esc(s.relatoCliente)}</textarea></div>
         <div class="field" style="max-width:220px; margin:0;"><label>Data de entrada</label><input type="date" id="sv-entrada" value="${esc(s.dataEntrada)}" ${F}></div>
+      </div>
+
+      <div class="bloco" id="sv-fotos">
+        <div class="chk-cab">
+          <h3 style="margin:0; font-size:15px; font-family:var(--font-display);">Fotos</h3>
+          <span class="chk-prog" id="fotos-prog"></span>
+        </div>
+        ${novo ? '<div class="hint" style="margin:0;">Crie o serviço para anexar fotos. Depois, abra esta O.S. no celular (botão "QR para o celular") e fotografe o aparelho.</div>' : `
+        <div class="fotos-grade" id="fotos-grade"></div>
+        <div class="fotos-botoes">
+          <label class="btn-small-primary btn-grande foto-btn">Tirar foto<input type="file" id="foto-camera" accept="image/*" capture="environment" hidden></label>
+          <label class="btn-secondary foto-btn">Escolher do aparelho<input type="file" id="foto-arquivo" accept="image/*" multiple hidden></label>
+        </div>`}
       </div>
 
       <div class="bloco" id="sv-chk">
@@ -274,7 +295,7 @@ export async function render(container, { param, navigate }) {
     alvo.querySelectorAll('.chk-op').forEach((b) => (b.onclick = () => tocarChecklist(b.dataset.i, b.dataset.v)));
     alvo.querySelectorAll('[data-campo]').forEach((inp) => (inp.oninput = () => { senhaAcesso = inp.value; agendarSalvarChecklist(); }));
   };
-  const salvarChecklist = async () => {
+  const salvarChecklist = () => salvarEmFila(async () => {
     try {
       const salvo = await repo.saveServico({ ...servicoById(s.id), checklist, senhaAcesso });
       guardarLocal('servicos', salvo);
@@ -284,7 +305,7 @@ export async function render(container, { param, navigate }) {
       toast(`Não foi possível salvar a conferência: ${e.message}`);
     }
     atualizarProgresso();
-  };
+  });
   // Numa O.S. já criada, salva sozinho meio segundo depois do último toque ou letra digitada.
   const agendarSalvarChecklist = () => {
     if (novo) { marcarSujo(); estadoChk = ''; } else { estadoChk = 'salvando…'; clearTimeout(timerChk); timerChk = setTimeout(salvarChecklist, 500); }
@@ -295,6 +316,72 @@ export async function render(container, { param, navigate }) {
     agendarSalvarChecklist();
     desenharChecklist();
   };
+
+  /* ---- fotos (só numa O.S. já criada; subir uma foto salva a O.S. na hora) ---- */
+  let fotos = [...(s.fotos ?? [])];
+  let enviando = false;
+  // Salvamentos em fila: uma foto e uma resposta do checklist nunca se sobrescrevem.
+  let fila = Promise.resolve();
+  const salvarEmFila = (tarefa) => { fila = fila.then(tarefa, tarefa); return fila; };
+  const alterarFotos = (transformar) => salvarEmFila(async () => {
+    const atual = servicoById(s.id);
+    const novas = transformar(atual.fotos ?? []);
+    const salvo = await repo.saveServico({ ...atual, fotos: novas });
+    guardarLocal('servicos', salvo);
+    fotos = novas;
+  });
+  const desenharFotos = (mensagem = '') => {
+    const grade = document.getElementById('fotos-grade');
+    if (!grade) return;
+    $('fotos-prog').textContent = mensagem || `${fotos.length} foto${fotos.length === 1 ? '' : 's'}`;
+    grade.innerHTML = fotos.length
+      ? fotos.map((f) => `<div class="foto"><button type="button" class="foto-img" data-ver="${esc(f.id)}" aria-label="Ampliar foto"><img src="${esc(f.url)}" alt="${esc(f.nome)}" loading="lazy"></button><button type="button" class="foto-x" data-del="${esc(f.id)}" aria-label="Remover foto">×</button></div>`).join('')
+      : '<div class="hint" style="margin:0;">Nenhuma foto ainda.</div>';
+    grade.querySelectorAll('[data-ver]').forEach((b) => (b.onclick = () => {
+      const f = fotos.find((x) => x.id === b.dataset.ver);
+      if (!f) return;
+      const quando = new Date(f.em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+      const m = openModal(`<img src="${esc(f.url)}" alt="${esc(f.nome)}" style="max-width:100%; max-height:70vh; display:block; margin:0 auto; border-radius:8px;">
+        <p class="hint" style="text-align:center;">${esc(quando)}${f.por ? ` · ${esc(f.por)}` : ''}</p>
+        <div class="modal-actions"><button class="btn-secondary" data-f>Fechar</button></div>`, 'modal-wide');
+      m.querySelector('[data-f]').onclick = closeModal;
+    }));
+    grade.querySelectorAll('[data-del]').forEach((b) => (b.onclick = async () => {
+      const f = fotos.find((x) => x.id === b.dataset.del);
+      if (!f || !(await confirmar('Remover esta foto?', 'Ela sai da O.S. e o arquivo é apagado. A remoção fica registrada no histórico.', 'Remover', true))) return;
+      try {
+        await alterarFotos((lista) => removerFoto(lista, f.id));
+        apagarArquivo(f.path);
+        desenharFotos();
+      } catch (e) { toast(`Não foi possível remover a foto: ${e.message}`); }
+    }));
+  };
+  const aoEscolherFotos = async (ev) => {
+    const arquivos = [...ev.target.files];
+    ev.target.value = '';
+    if (!arquivos.length || enviando) return;
+    if (fotos.length + arquivos.length > MAX_FOTOS) { toast(`No máximo ${MAX_FOTOS} fotos por O.S.`); return; }
+    enviando = true;
+    for (const [i, arquivo] of arquivos.entries()) {
+      desenharFotos(`Enviando ${i + 1} de ${arquivos.length}…`);
+      try {
+        const nova = await enviarFoto(s.id, arquivo, currentUsuario()?.nome);
+        await alterarFotos((lista) => [...lista, nova]);
+      } catch (e) { toast(e.message); break; }
+    }
+    enviando = false;
+    desenharFotos();
+  };
+  if (!novo) {
+    $('foto-camera').onchange = aoEscolherFotos;
+    $('foto-arquivo').onchange = aoEscolherFotos;
+    desenharFotos();
+    // Foto enviada de outro aparelho (o celular) aparece aqui sozinha.
+    atualizarFotosDeFora = () => {
+      const atual = servicoById(s.id);
+      if (atual && !enviando && document.getElementById('fotos-grade')) { fotos = [...(atual.fotos ?? [])]; desenharFotos(); }
+    };
+  } else atualizarFotosDeFora = null;
 
   /* ---- abas por etapa, links do cabeçalho e faturamento ---- */
   let pago = !!s.pago;
@@ -453,6 +540,8 @@ export async function render(container, { param, navigate }) {
       garantiaDias: num($('sv-garantia').value), garantiaObs: $('sv-garantia-obs').value.trim(),
       terceiro: $('sv-terc-on').checked ? lerTerceiro() : null, obs: $('sv-obs').value.trim(),
       checklist, senhaAcesso: senhaAcesso.trim(), checklistObs: $('chk-obs').value.trim(),
+      // As fotos podem ter mudado depois que a tela abriu (inclusive vindas do celular): leva as mais recentes.
+      ...(novo ? {} : { fotos: servicoById(s.id)?.fotos ?? fotos }),
     };
     botao.disabled = true;
     try {

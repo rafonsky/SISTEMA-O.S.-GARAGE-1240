@@ -46,7 +46,7 @@ npm run test:rules        # regras de segurança e gravação com log (emulador 
 Para abrir o app com dados de teste:
 
 ```bash
-npx firebase emulators:start --only firestore,auth --project demo-os-garage
+npx firebase emulators:start --only firestore,auth,storage --project demo-os-garage
 node scripts/dev-seed.mjs     # em outro terminal: cria dev@teste.com / senha123 e carrega os dados do backup
 node scripts/serve.mjs 5173   # em outro terminal
 ```

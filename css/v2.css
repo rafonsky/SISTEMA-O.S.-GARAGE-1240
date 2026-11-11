@@ -182,3 +182,16 @@ tr.linha-link:hover td, tr.linha-link:focus-visible td{ background:var(--panel-2
   .fat-valor{ font-size:28px; }
   #fat-selo{ align-items:flex-start; }
 }
+
+/* ---------- Fotos ---------- */
+.fotos-grade{ display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:10px; margin-bottom:12px; }
+.foto{ position:relative; }
+.foto-img{ display:block; width:100%; padding:0; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--panel-2); cursor:zoom-in; }
+.foto-img img{ display:block; width:100%; aspect-ratio:4/3; object-fit:cover; }
+.foto-x{
+  position:absolute; top:4px; right:4px; width:32px; height:32px; border-radius:50%; border:none; cursor:pointer;
+  background:rgba(0,0,0,.65); color:#fff; font-size:20px; line-height:1;
+}
+.fotos-botoes{ display:flex; flex-wrap:wrap; gap:10px; }
+.foto-btn{ display:inline-flex; align-items:center; justify-content:center; min-height:44px; cursor:pointer; }
+@media (max-width:520px){ .foto-btn{ flex:1; } }
