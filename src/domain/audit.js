@@ -7,12 +7,15 @@ function achatar(obj, prefixo = '', saida = {}) {
   return saida;
 }
 
+// Ausente, nulo e texto vazio contam como a mesma coisa ("sem valor"), para o histórico não registrar ruído.
+const semValor = (v) => v === null || v === undefined || v === '';
+
 export function diffCampos(antes, depois) {
   const a = achatar(antes);
   const d = achatar(depois);
   const campos = [...new Set([...Object.keys(a), ...Object.keys(d)])];
   return campos
-    .filter((c) => JSON.stringify(a[c] ?? null) !== JSON.stringify(d[c] ?? null))
+    .filter((c) => !(semValor(a[c]) && semValor(d[c])) && JSON.stringify(a[c] ?? null) !== JSON.stringify(d[c] ?? null))
     .map((c) => ({ campo: c, antes: a[c] ?? null, depois: d[c] ?? null }));
 }
 

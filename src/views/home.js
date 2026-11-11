@@ -3,6 +3,8 @@ import { esc, hojeStr, fmtData } from '../ui.js';
 import { resumoPainel, buscarGlobal } from '../domain/painel.js';
 import { formatBRL } from '../domain/finance.js';
 import { diasRestantes } from '../domain/prazo.js';
+import { filaDoPapel, ROTULO_PAPEL } from '../domain/papeis.js';
+import { currentUsuario } from '../auth.js';
 
 let termo = '';
 
@@ -48,14 +50,15 @@ function desenharPainel(navigate) {
   const hoje = hojeStr();
   const r = resumoPainel(store.servicos, hoje);
   const alvo = document.getElementById('h-painel');
-  const cartao = (n, rotulo) => `<div class="cartao-painel"><b>${n}</b><small>${rotulo}</small></div>`;
+  const cartao = (n, rotulo, grupo) => `<button type="button" class="cartao-painel clicavel" data-grupo="${grupo}"><b>${n}</b><small>${rotulo}</small><span class="cp-seta">Ver lista ›</span></button>`;
   alvo.innerHTML = `
     <div class="cartoes-painel">
-      ${cartao(r.emAndamento, 'Em andamento')}
-      ${cartao(r.noTerceiro, 'No terceiro')}
-      ${cartao(r.aguardandoAprovacao, 'Aguardando aprovação')}
-      ${cartao(formatBRL(r.aReceber), 'A receber')}
+      ${cartao(r.emAndamento, 'Em andamento', 'em-andamento')}
+      ${cartao(r.noTerceiro, 'No terceiro', 'no-terceiro')}
+      ${cartao(r.aguardandoAprovacao, 'Aguardando aprovação', 'aguardando-aprovacao')}
+      ${cartao(formatBRL(r.aReceber), 'A receber', 'a-receber')}
     </div>
+    ${blocoFila()}
     <h3 class="sub-titulo">Precisa de atenção</h3>
     ${r.atencao.length ? `<div class="lista-atencao">${r.atencao.map(({ servico: s, motivo }) => {
       const e = equipById(s.equipamentoId);
@@ -67,4 +70,17 @@ function desenharPainel(navigate) {
         <span class="ia-motivo">${esc(motivo)}${esc(extra)}</span></button>`;
     }).join('')}</div>` : '<div class="empty" style="padding:28px;">Tudo em dia. Nada precisando de atenção.</div>'}`;
   alvo.querySelectorAll('[data-os]').forEach((b) => (b.onclick = () => navigate(`servico/${b.dataset.os}`)));
+  alvo.querySelectorAll('[data-grupo]').forEach((b) => (b.onclick = () => navigate(`servicos/${b.dataset.grupo}`)));
+}
+
+// Fila de trabalho de quem está logado (organiza a tela; qualquer pessoa vê tudo no sistema).
+function blocoFila() {
+  const papel = currentUsuario()?.papel ?? 'admin';
+  const { titulo, servicos } = filaDoPapel(papel, store.servicos);
+  const itens = servicos.slice(0, 8).map((s) => `<button class="item-atencao" data-os="${esc(s.id)}">
+    <span class="os-id">${esc(s.id)}</span>
+    <span class="ia-txt"><b>${esc(equipById(s.equipamentoId)?.nome ?? '—')}</b><small>${esc(clienteById(s.clienteId)?.nome ?? '')}</small></span>
+    <span class="ia-motivo">${esc(s.status)}</span></button>`).join('');
+  return `<h3 class="sub-titulo">${esc(titulo)} <small class="papel-selo">${esc(ROTULO_PAPEL[papel])}</small></h3>
+    ${servicos.length ? `<div class="lista-atencao">${itens}</div>${servicos.length > 8 ? `<div class="hint">e mais ${servicos.length - 8}. Veja todos na tela Serviços.</div>` : ''}` : '<div class="empty" style="padding:22px;">Nada na sua fila agora.</div>'}`;
 }

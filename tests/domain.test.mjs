@@ -119,3 +119,10 @@ test('FINAL: terceiro que já devolveu o aparelho não gera alerta de prazo', ()
   assert.equal(diasRestantes(t, '2026-11-08'), null);
   assert.equal(precisaAtencao({ status: 'Em andamento', terceiro: t }, '2026-11-08'), null);
 });
+
+test('diffCampos: campo que passou de ausente para texto vazio não é mudança', async () => {
+  const { diffCampos } = await import('../src/domain/audit.js');
+  assert.deepEqual(diffCampos({ a: 1 }, { a: 1, senhaAcesso: '' }), []);
+  assert.deepEqual(diffCampos({ x: null }, { x: '' }), []);
+  assert.deepEqual(diffCampos({ x: '' }, { x: 'abc' }).map((m) => m.campo), ['x']);
+});

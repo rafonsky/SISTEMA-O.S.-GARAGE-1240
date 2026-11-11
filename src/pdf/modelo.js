@@ -2,6 +2,7 @@
 // Regra: nada interno entra aqui (custo do terceiro, margem, observação interna).
 import { fmtData, periodoTexto } from '../domain/datas.js';
 import { specsLinha } from '../domain/equipamento.js';
+import { itensPara } from '../domain/checklist.js';
 
 export const CONTATO = 'Rafael / Eduardo · (41) 9131-2064 · garage1240.oficial@gmail.com';
 
@@ -12,8 +13,22 @@ export const statusParaCliente = (status) => STATUS_PARA_CLIENTE[status] ?? stat
 const temValor = (v) => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
 const moeda = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/ /g, ' ');
 
+const ROTULO_RESPOSTA = { sim: 'Sim', nao: 'Não', na: 'Não se aplica' };
+
+// Só entram as perguntas respondidas. A senha de acesso NUNCA vai no relatório (só a resposta Sim/Não da pergunta).
+function secaoConferencia(s, equipamento) {
+  const linhas = itensPara(equipamento?.tipo)
+    .filter((i) => ROTULO_RESPOSTA[s.checklist?.[i.id]])
+    .map((i) => `${i.pergunta} — ${ROTULO_RESPOSTA[s.checklist[i.id]]}`);
+  if (!linhas.length) return null;
+  if (s.checklistObs) linhas.push(`Observação: ${s.checklistObs}`);
+  return { titulo: 'Conferência na entrada', tipo: 'lista', conteudo: linhas };
+}
+
 export function buildRelatorioModel({ servico: s, equipamento, cliente, hoje }) {
   const secoes = [{ titulo: 'Problema', tipo: 'texto', conteudo: s.relatoCliente }];
+  const conferencia = secaoConferencia(s, equipamento);
+  if (conferencia) secoes.push(conferencia);
   if (s.diagnostico) secoes.push({ titulo: 'Diagnóstico', tipo: 'texto', conteudo: s.diagnostico });
   if (s.acoes?.length) secoes.push({ titulo: 'Ações realizadas', tipo: 'lista', conteudo: [...s.acoes] });
   if (s.recomendacoes?.length) secoes.push({ titulo: 'Recomendações', tipo: 'lista', conteudo: [...s.recomendacoes] });

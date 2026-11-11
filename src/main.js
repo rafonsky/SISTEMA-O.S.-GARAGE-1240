@@ -22,6 +22,7 @@ aplicarTema();
 /* ---------- rotas ---------- */
 const ROTAS = {
   inicio: { arquivo: './views/home.js', titulo: 'Início' },
+  servicos: { arquivo: './views/servicos.js', titulo: 'Serviços' },
   servico: { arquivo: './views/servico.js', titulo: 'Serviço' },
   equipamentos: { arquivo: './views/equipamentos.js', titulo: 'Equipamentos' },
   clientes: { arquivo: './views/clientes.js', titulo: 'Clientes' },
@@ -29,6 +30,7 @@ const ROTAS = {
 };
 const MENU = [
   { rota: 'inicio', rotulo: 'Início', icone: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>' },
+  { rota: 'servicos', rotulo: 'Serviços', icone: '<path d="M9 11l3 3 8-8"/><rect x="3" y="4" width="16" height="16" rx="2"/>' },
   { rota: 'equipamentos', rotulo: 'Equipamentos', icone: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>' },
   { rota: 'clientes', rotulo: 'Clientes', icone: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>' },
   { rota: 'conferencia', rotulo: 'Conferência', icone: '<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/>' },

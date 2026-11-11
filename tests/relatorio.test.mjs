@@ -78,3 +78,32 @@ test('FINAL: status interno "No terceiro" aparece ao cliente como "Em andamento"
   assert.equal(m.status, 'Em andamento');
   assert.doesNotMatch(JSON.stringify(m), /terceiro/i);
 });
+
+test('conferência de entrada vai no relatório com as respostas, sem a senha e sem perguntas em branco', () => {
+  const m = buildRelatorioModel({
+    ...acer,
+    servico: {
+      ...acer.servico,
+      checklist: { liga: 'sim', carcaca: 'nao', fonte: 'na', senha: 'sim' },
+      senhaAcesso: 'abc123',
+      checklistObs: 'Riscos na tampa',
+    },
+  });
+  assert.deepEqual(m.secoes.map((s) => s.titulo), ['Problema', 'Conferência na entrada', 'Ações realizadas']);
+  const itens = m.secoes[1].conteudo;
+  assert.deepEqual(itens, [
+    'O equipamento liga? — Sim',
+    'Carcaça sem riscos ou amassados? — Não',
+    'Acompanha fonte/carregador? — Não se aplica',
+    'O cliente informou a senha de acesso? — Sim',
+    'Observação: Riscos na tampa',
+  ]);
+  assert.ok(!JSON.stringify(m).includes('abc123'));
+});
+
+test('sem conferência respondida, o relatório não ganha a seção', () => {
+  const m = buildRelatorioModel({ ...acer, servico: { ...acer.servico, checklist: {} } });
+  assert.ok(!m.secoes.some((s) => s.titulo === 'Conferência na entrada'));
+  const velho = buildRelatorioModel({ ...acer, servico: { ...acer.servico, checklistEntrada: ['Carcaça riscada'] } });
+  assert.ok(!velho.secoes.some((s) => s.titulo === 'Conferência na entrada'));
+});

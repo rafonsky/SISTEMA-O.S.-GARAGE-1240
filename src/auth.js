@@ -1,6 +1,7 @@
 import { signInWithEmailAndPassword, signOut as fbSignOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
+import { normalizarPapel } from './domain/papeis.js';
 
 let usuarioAtual = null;
 export const currentUsuario = () => usuarioAtual;
@@ -38,7 +39,7 @@ export function onUser(cb) {
         usuarioAtual = null;
         return cb(null, 'Este usuário ainda não foi liberado. Fale com o administrador.');
       }
-      usuarioAtual = { uid: user.uid, email: user.email, nome: snap.data().nome ?? user.email };
+      usuarioAtual = { uid: user.uid, email: user.email, nome: snap.data().nome ?? user.email, papel: normalizarPapel(snap.data().role) };
       cb(usuarioAtual);
     } catch (e) {
       usuarioAtual = null;

@@ -6,15 +6,20 @@ import { diasRestantes } from '../domain/prazo.js';
 import { rotuloTipo, specsLinha } from '../domain/equipamento.js';
 import { abrirFormEquipamento } from './equipamentos.js';
 import { resumoChecklist, itensPara, definirResposta, linkDaOs, enderecoSoDoComputador } from '../domain/checklist.js';
+import { ABAS, ROTULO_PAPEL, abaDaEtapa, abaInicial } from '../domain/papeis.js';
+import { currentUsuario } from '../auth.js';
+import { definirBusca as buscarEquipamento } from './equipamentos.js';
+import { definirBusca as buscarCliente } from './clientes.js';
 
 let pararLog = null;
+const FORMAS_PAGAMENTO = ['PIX', 'Dinheiro', 'Cartão de débito', 'Cartão de crédito', 'Transferência', 'Outra'];
 
 const LABELS = {
   status: 'Status', relatoCliente: 'Relato do cliente', diagnostico: 'Diagnóstico', acoes: 'Ações realizadas',
   recomendacoes: 'Recomendações', dataEntrada: 'Data de entrada', dataInicio: 'Início do serviço', previsaoEntrega: 'Previsão',
   dataConclusao: 'Conclusão', valorCobrado: 'Valor cobrado', pago: 'Pago', dataPagamento: 'Data do pagamento',
   garantiaDias: 'Garantia (dias)', garantiaObs: 'Condições da garantia', obs: 'Observação interna',
-  senhaAcesso: 'Senha de acesso', checklistObs: 'Conferência de entrada (observação)',
+  senhaAcesso: 'Senha de acesso', formaPagamento: 'Forma de pagamento', tecnicoResponsavel: 'Responsável técnico', pecas: 'Peças necessárias', checklistObs: 'Conferência de entrada (observação)',
   clienteId: 'Cliente', equipamentoId: 'Equipamento', 'terceiro.custo': 'Custo do terceiro', 'terceiro.nome': 'Terceiro',
 };
 
@@ -43,13 +48,14 @@ export async function render(container, { param, navigate }) {
     container.innerHTML = '<div class="empty">Serviço não encontrado.</div>';
     return;
   }
+  const papel = currentUsuario()?.papel ?? 'admin';
   const equipPreset = new URLSearchParams(consulta).get('equip');
   const equipInicial = equipPreset ? equipById(equipPreset) : null;
   const s = existente ?? {
     clienteId: equipInicial?.clienteId ?? '', equipamentoId: equipInicial?.id ?? '', status: 'Recebido',
     relatoCliente: '', diagnostico: '', acoes: [], recomendacoes: [], dataEntrada: hojeStr(), dataInicio: '',
     previsaoEntrega: '', dataConclusao: '', valorCobrado: null, pago: false, dataPagamento: '', garantiaDias: null,
-    garantiaObs: '', terceiro: null, obs: '',
+    garantiaObs: '', terceiro: null, obs: '', tecnicoResponsavel: '', pecas: '', formaPagamento: '',
   };
   const t = s.terceiro ?? { nome: '', contato: '', enviadoEm: '', diagnosticoEm: '', aprovadoEm: '', emConsertoEm: '', devolvidoEm: '', prazoDias: '', custo: '', garantiaDias: '' };
   const F = 'style="font-family:var(--font-body);"';
@@ -65,99 +71,137 @@ export async function render(container, { param, navigate }) {
       </div>
     </div>
 
+    <div class="ficha-links">
+      <button type="button" class="link-chip" id="lk-cliente"><small>Cliente</small><b id="lk-cliente-t">—</b></button>
+      <button type="button" class="link-chip" id="lk-equip"><small>Equipamento</small><b id="lk-equip-t">—</b></button>
+      <button type="button" class="link-chip" data-ir-aba="recepcao"><small>Entrada</small><b id="lk-entrada-t">—</b></button>
+      <button type="button" class="link-chip" data-ir-aba="tecnico"><small>Responsável técnico</small><b id="lk-tec-t">—</b></button>
+      <span class="papel-selo" title="Seu papel no sistema">${esc(ROTULO_PAPEL[papel])}</span>
+    </div>
+
     <div class="etapas" id="sv-etapas"></div>
-    <div class="field" style="max-width:320px;"><label>Status</label>
-      <select class="select" id="sv-status" style="width:100%;">${STATUS_LIST.map((x) => `<option ${x === s.status ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
-
-    <div class="bloco">
-      <div class="grade-2">
-        <div class="field"><label>Cliente</label>
-          <select id="sv-cliente" ${F}><option value="">— escolha —</option>${clientes.map((c) => `<option value="${esc(c.id)}" ${c.id === s.clienteId ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></div>
-        <div class="field"><label>Equipamento</label>
-          <select id="sv-equip" ${F}></select>
-          <button type="button" class="link-btn" id="sv-novo-equip" style="margin-top:6px;">+ Cadastrar novo equipamento</button></div>
-      </div>
-      <div class="hint" id="sv-equip-info" style="margin:0;"></div>
+    <div class="status-linha">
+      <div class="field" style="max-width:320px; margin:0;"><label>Status <span class="hint-inline">(para mudar de etapa)</span></label>
+        <select class="select" id="sv-status" style="width:100%;">${STATUS_LIST.map((x) => `<option ${x === s.status ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
+      <button type="button" class="btn-secondary" id="sv-avancar" style="display:none;"></button>
     </div>
 
-    <div class="bloco" id="sv-chk">
-      <div class="chk-cab">
-        <h3 style="margin:0; font-size:15px; font-family:var(--font-display);">Conferência de entrada</h3>
-        <span class="chk-prog" id="chk-prog"></span>
-      </div>
-      <div id="chk-lista"></div>
-      ${s.checklistEntrada?.length ? `<div class="hint" style="margin:10px 0 0;">Anotado no sistema antigo: ${esc(s.checklistEntrada.join(' · '))}</div>` : ''}
-      <div class="field" style="margin:12px 0 0;"><label>O que estava diferente do normal <span class="hint-inline">(riscos, peças faltando, o que não funciona)</span></label>
-        <textarea id="chk-obs" rows="2" ${F}>${esc(s.checklistObs)}</textarea></div>
+    <div class="abas" id="sv-abas" role="tablist">
+      ${ABAS.map((a) => `<button type="button" class="aba" role="tab" data-aba="${a.id}" title="Quem costuma preencher: ${esc(a.dono)}">${esc(a.rotulo)}<i class="aba-ponto"></i></button>`).join('')}
     </div>
 
-    <div class="bloco">
-      <div class="field"><label>Relato do cliente <span class="hint-inline">(como ele descreveu — não é alterado pelo diagnóstico)</span></label>
-        <textarea id="sv-relato" rows="3" ${F}>${esc(s.relatoCliente)}</textarea></div>
-      <div class="field"><label>Diagnóstico técnico</label>
-        <textarea id="sv-diag" rows="3" ${F}>${esc(s.diagnostico)}</textarea></div>
-      <div class="grade-2">
-        <div class="field"><label>Ações realizadas <span class="hint-inline">(uma por linha)</span></label>
-          <textarea id="sv-acoes" rows="6" ${F}>${esc((s.acoes ?? []).join('\n'))}</textarea></div>
-        <div class="field"><label>Recomendações ao cliente <span class="hint-inline">(uma por linha)</span></label>
-          <textarea id="sv-recs" rows="6" ${F}>${esc((s.recomendacoes ?? []).join('\n'))}</textarea></div>
-      </div>
-    </div>
-
-    <div class="bloco">
-      <div class="grade-4">
-        <div class="field"><label>Entrada</label><input type="date" id="sv-entrada" value="${esc(s.dataEntrada)}" ${F}></div>
-        <div class="field"><label>Início do serviço</label><input type="date" id="sv-inicio" value="${esc(s.dataInicio)}" ${F}></div>
-        <div class="field"><label>Previsão de entrega</label><input type="date" id="sv-previsao" value="${esc(s.previsaoEntrega)}" ${F}></div>
-        <div class="field"><label>Conclusão</label><input type="date" id="sv-conclusao" value="${esc(s.dataConclusao)}" ${F}></div>
-      </div>
-    </div>
-
-    <div class="bloco">
-      <label class="check-linha"><input type="checkbox" id="sv-terc-on" ${s.terceiro ? 'checked' : ''}> Serviço terceirizado (levado a outra oficina)</label>
-      <div id="sv-terc" style="display:${s.terceiro ? 'block' : 'none'}; margin-top:12px;">
+    <section class="painel-aba" data-painel="recepcao">
+      <div class="bloco">
         <div class="grade-2">
-          <div class="field"><label>Quem está com o aparelho</label><input type="text" id="t-nome" value="${esc(t.nome)}" ${F}></div>
-          <div class="field"><label>Contato</label><input type="text" id="t-contato" value="${esc(t.contato)}" ${F}></div>
+          <div class="field"><label>Cliente</label>
+            <select id="sv-cliente" ${F}><option value="">— escolha —</option>${clientes.map((c) => `<option value="${esc(c.id)}" ${c.id === s.clienteId ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></div>
+          <div class="field"><label>Equipamento</label>
+            <select id="sv-equip" ${F}></select>
+            <button type="button" class="link-btn" id="sv-novo-equip" style="margin-top:6px;">+ Cadastrar novo equipamento</button></div>
         </div>
-        <div class="grade-4">
-          <div class="field"><label>Enviado em</label><input type="date" id="t-enviado" value="${esc(t.enviadoEm)}" ${F}></div>
-          <div class="field"><label>Diagnóstico recebido</label><input type="date" id="t-diag" value="${esc(t.diagnosticoEm)}" ${F}></div>
-          <div class="field"><label>Orçamento aprovado</label><input type="date" id="t-aprov" value="${esc(t.aprovadoEm)}" ${F}></div>
-          <div class="field"><label>Em conserto desde</label><input type="date" id="t-conserto" value="${esc(t.emConsertoEm)}" ${F}></div>
-        </div>
-        <div class="grade-4">
-          <div class="field"><label>Devolvido em</label><input type="date" id="t-devolvido" value="${esc(t.devolvidoEm)}" ${F}></div>
-          <div class="field"><label>Prazo prometido (dias)</label><input type="number" min="0" id="t-prazo" value="${esc(t.prazoDias)}" ${F}></div>
-          <div class="field"><label>Custo do terceiro (R$)</label><input type="number" min="0" step="0.01" id="t-custo" value="${esc(t.custo)}" ${F}></div>
-          <div class="field"><label>Garantia do terceiro (dias)</label><input type="number" min="0" id="t-garantia" value="${esc(t.garantiaDias)}" ${F}></div>
-        </div>
-        <div class="hint" id="t-prazo-info" style="margin:0;"></div>
+        <div class="hint" id="sv-equip-info" style="margin:0;"></div>
       </div>
-    </div>
 
-    <div class="bloco">
-      <div class="valores">
-        <div class="field"><label>Valor cobrado do cliente (R$)</label><input type="number" min="0" step="0.01" id="sv-valor" value="${s.valorCobrado ?? ''}" ${F}></div>
-        <div class="valor-card" id="sv-margem-card"><small>Sobra para a Garage</small><b id="sv-margem">—</b></div>
-        <div class="field"><label>Pagamento</label>
-          <label class="check-linha" style="margin-top:8px;"><input type="checkbox" id="sv-pago" ${s.pago ? 'checked' : ''}> Já foi pago</label></div>
-        <div class="field"><label>Data do pagamento</label><input type="date" id="sv-datapag" value="${esc(s.dataPagamento)}" ${F}></div>
+      <div class="bloco">
+        <div class="field"><label>Relato do cliente <span class="hint-inline">(como ele descreveu — não é alterado pelo diagnóstico)</span></label>
+          <textarea id="sv-relato" rows="3" ${F}>${esc(s.relatoCliente)}</textarea></div>
+        <div class="field" style="max-width:220px; margin:0;"><label>Data de entrada</label><input type="date" id="sv-entrada" value="${esc(s.dataEntrada)}" ${F}></div>
       </div>
-      <div class="grade-2" style="margin-top:12px;">
-        <div class="field"><label>Garantia do serviço (dias)</label><input type="number" min="0" id="sv-garantia" value="${s.garantiaDias ?? ''}" ${F}></div>
-        <div class="field"><label>Condições da garantia</label><input type="text" id="sv-garantia-obs" value="${esc(s.garantiaObs)}" ${F}></div>
-      </div>
-    </div>
 
-    <div class="bloco">
-      <div class="field"><label>Observação interna <span class="hint-inline">(não aparece no relatório do cliente)</span></label>
-        <textarea id="sv-obs" rows="2" ${F}>${esc(s.obs)}</textarea></div>
-    </div>
+      <div class="bloco" id="sv-chk">
+        <div class="chk-cab">
+          <h3 style="margin:0; font-size:15px; font-family:var(--font-display);">Conferência de entrada</h3>
+          <span class="chk-prog" id="chk-prog"></span>
+        </div>
+        <div id="chk-lista"></div>
+        ${s.checklistEntrada?.length ? `<div class="hint" style="margin:10px 0 0;">Anotado no sistema antigo: ${esc(s.checklistEntrada.join(' · '))}</div>` : ''}
+        <div class="field" style="margin:12px 0 0;"><label>O que estava diferente do normal <span class="hint-inline">(riscos, peças faltando, o que não funciona)</span></label>
+          <textarea id="chk-obs" rows="2" ${F}>${esc(s.checklistObs)}</textarea></div>
+      </div>
+
+      <div class="bloco">
+        <div class="field" style="margin:0;"><label>Observação interna <span class="hint-inline">(não aparece no relatório do cliente)</span></label>
+          <textarea id="sv-obs" rows="2" ${F}>${esc(s.obs)}</textarea></div>
+      </div>
+    </section>
+
+    <section class="painel-aba" data-painel="tecnico" hidden>
+      <div class="bloco">
+        <div class="grade-2">
+          <div class="field"><label>Responsável técnico</label><input type="text" id="sv-tec" value="${esc(s.tecnicoResponsavel)}" ${F}></div>
+          <div class="field"><label>Início do serviço</label><input type="date" id="sv-inicio" value="${esc(s.dataInicio)}" ${F}></div>
+        </div>
+        <div class="field"><label>Diagnóstico técnico</label>
+          <textarea id="sv-diag" rows="4" ${F}>${esc(s.diagnostico)}</textarea></div>
+        <div class="grade-2">
+          <div class="field"><label>Ações realizadas <span class="hint-inline">(uma por linha)</span></label>
+            <textarea id="sv-acoes" rows="6" ${F}>${esc((s.acoes ?? []).join('\n'))}</textarea></div>
+          <div class="field"><label>Recomendações ao cliente <span class="hint-inline">(uma por linha)</span></label>
+            <textarea id="sv-recs" rows="6" ${F}>${esc((s.recomendacoes ?? []).join('\n'))}</textarea></div>
+        </div>
+        <div class="field" style="margin:0;"><label>Peças necessárias <span class="hint-inline">(só o que precisa; o valor entra no Orçamento)</span></label>
+          <textarea id="sv-pecas" rows="2" ${F}>${esc(s.pecas)}</textarea></div>
+      </div>
+
+      <div class="bloco">
+        <label class="check-linha"><input type="checkbox" id="sv-terc-on" ${s.terceiro ? 'checked' : ''}> Serviço terceirizado (levado a outra oficina)</label>
+        <div id="sv-terc" style="display:${s.terceiro ? 'block' : 'none'}; margin-top:12px;">
+          <div class="grade-2">
+            <div class="field"><label>Quem está com o aparelho</label><input type="text" id="t-nome" value="${esc(t.nome)}" ${F}></div>
+            <div class="field"><label>Contato</label><input type="text" id="t-contato" value="${esc(t.contato)}" ${F}></div>
+          </div>
+          <div class="grade-4">
+            <div class="field"><label>Enviado em</label><input type="date" id="t-enviado" value="${esc(t.enviadoEm)}" ${F}></div>
+            <div class="field"><label>Diagnóstico recebido</label><input type="date" id="t-diag" value="${esc(t.diagnosticoEm)}" ${F}></div>
+            <div class="field"><label>Orçamento aprovado</label><input type="date" id="t-aprov" value="${esc(t.aprovadoEm)}" ${F}></div>
+            <div class="field"><label>Em conserto desde</label><input type="date" id="t-conserto" value="${esc(t.emConsertoEm)}" ${F}></div>
+          </div>
+          <div class="grade-4">
+            <div class="field"><label>Devolvido em</label><input type="date" id="t-devolvido" value="${esc(t.devolvidoEm)}" ${F}></div>
+            <div class="field"><label>Prazo prometido (dias)</label><input type="number" min="0" id="t-prazo" value="${esc(t.prazoDias)}" ${F}></div>
+            <div class="field"><label>Custo do terceiro (R$)</label><input type="number" min="0" step="0.01" id="t-custo" value="${esc(t.custo)}" ${F}></div>
+            <div class="field"><label>Garantia do terceiro (dias)</label><input type="number" min="0" id="t-garantia" value="${esc(t.garantiaDias)}" ${F}></div>
+          </div>
+          <div class="hint" id="t-prazo-info" style="margin:0;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="painel-aba" data-painel="orcamento" hidden>
+      <div class="bloco">
+        <div class="valores">
+          <div class="field"><label>Valor cobrado do cliente (R$)</label><input type="number" min="0" step="0.01" id="sv-valor" value="${s.valorCobrado ?? ''}" ${F}></div>
+          <div class="valor-card" id="sv-margem-card"><small>Sobra para a Garage</small><b id="sv-margem">—</b></div>
+          <div class="field"><label>Previsão de entrega</label><input type="date" id="sv-previsao" value="${esc(s.previsaoEntrega)}" ${F}></div>
+          <div class="field"><label>Garantia do serviço (dias)</label><input type="number" min="0" id="sv-garantia" value="${s.garantiaDias ?? ''}" ${F}></div>
+        </div>
+        <div class="field" style="margin:12px 0 0;"><label>Condições da garantia</label><input type="text" id="sv-garantia-obs" value="${esc(s.garantiaObs)}" ${F}></div>
+      </div>
+    </section>
+
+    <section class="painel-aba" data-painel="faturamento" hidden>
+      <div class="bloco">
+        <div class="fat-topo">
+          <div><small class="fat-rotulo">Valor cobrado</small><b class="fat-valor" id="fat-valor">—</b></div>
+          <div id="fat-selo"></div>
+        </div>
+        <div class="grade-4" style="margin-top:14px;">
+          <div class="field"><label>Data do pagamento</label><input type="date" id="sv-datapag" value="${esc(s.dataPagamento)}" ${F}></div>
+          <div class="field"><label>Forma de pagamento</label>
+            <select id="sv-forma" ${F}><option value="">—</option>${FORMAS_PAGAMENTO.map((f) => `<option ${f === s.formaPagamento ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select></div>
+          <div class="field"><label>Conclusão do serviço</label><input type="date" id="sv-conclusao" value="${esc(s.dataConclusao)}" ${F}></div>
+        </div>
+        <div class="fat-acoes" id="fat-acoes"></div>
+        <div class="hint" style="margin:10px 0 0;">Marcar como pago salva a O.S. na hora. A retirada sem pagar fica a seu critério: o sistema só avisa.</div>
+      </div>
+    </section>
+
+    <section class="painel-aba" data-painel="historico" hidden>
+      ${novo ? '<div class="bloco"><div class="hint" style="margin:0;">O histórico começa quando o serviço for criado.</div></div>'
+        : '<div class="bloco"><h3 style="margin:0 0 10px; font-size:15px; font-family:var(--font-display);">Histórico de alterações</h3><div id="sv-log" class="hint" style="margin:0;">Carregando…</div></div>'}
+    </section>
 
     <div class="err" id="sv-erro" role="alert"></div>
-
-    ${novo ? '' : `<div class="bloco"><h3 style="margin:0 0 10px; font-size:15px; font-family:var(--font-display);">Histórico de alterações</h3><div id="sv-log" class="hint" style="margin:0;">Carregando…</div></div>`}
   `;
 
   const $ = (id) => document.getElementById(id);
@@ -172,10 +216,19 @@ export async function render(container, { param, navigate }) {
       const cls = e === atual ? 'atual' : ia > i && ia !== -1 ? 'feita' : '';
       return `<button type="button" class="etapa ${cls}" data-etapa="${esc(e)}">${cls === 'feita' ? '✔ ' : ''}${esc(e)}</button>`;
     }).join('') + (!ETAPAS.includes(atual) ? `<span class="etapa atual">${esc(atual)}</span>` : '');
-    $('sv-etapas').querySelectorAll('[data-etapa]').forEach((b) => (b.onclick = () => { statusEl.value = b.dataset.etapa; desenharEtapas(); }));
+    $('sv-etapas').querySelectorAll('[data-etapa]').forEach((b) => {
+      b.title = 'Abrir a aba desta etapa (não muda o status)';
+      b.onclick = () => abrirAba(abaDaEtapa(b.dataset.etapa));
+    });
+    const i = ETAPAS.indexOf(atual);
+    const proxima = i >= 0 ? ETAPAS[i + 1] : null;
+    const btn = $('sv-avancar');
+    btn.style.display = proxima ? '' : 'none';
+    btn.textContent = proxima ? `Avançar para: ${proxima}` : '';
+    btn.onclick = () => { statusEl.value = proxima; marcarSujo(); desenharEtapas(); abrirAba(abaDaEtapa(proxima)); };
+    atualizarPendencias();
   };
   statusEl.onchange = desenharEtapas;
-  desenharEtapas();
 
   /* ---- aviso de alterações não salvas ---- */
   let sujo = false;
@@ -197,6 +250,7 @@ export async function render(container, { param, navigate }) {
     if (!el || !tipo) return;
     const r = resumoChecklist(tipo, checklist);
     el.textContent = `${r.respondidos}/${r.total} respondidas${estadoChk ? ` · ${estadoChk}` : ''}`;
+    atualizarPendencias();
   };
   const desenharChecklist = () => {
     const alvo = document.getElementById('chk-lista');
@@ -241,6 +295,88 @@ export async function render(container, { param, navigate }) {
     agendarSalvarChecklist();
     desenharChecklist();
   };
+
+  /* ---- abas por etapa, links do cabeçalho e faturamento ---- */
+  let pago = !!s.pago;
+  const abrirAba = (id) => {
+    container.querySelectorAll('[data-painel]').forEach((p) => { p.hidden = p.dataset.painel !== id; });
+    container.querySelectorAll('.aba').forEach((b) => {
+      const ativa = b.dataset.aba === id;
+      b.classList.toggle('ativa', ativa);
+      b.setAttribute('aria-selected', String(ativa));
+    });
+  };
+  container.querySelectorAll('.aba').forEach((b) => (b.onclick = () => abrirAba(b.dataset.aba)));
+  container.querySelectorAll('[data-ir-aba]').forEach((b) => (b.onclick = () => abrirAba(b.dataset.irAba)));
+
+  // Ponto âmbar na aba quando falta preencher algo daquela etapa.
+  const atualizarPendencias = () => {
+    const tipo = tipoAtual();
+    const status = statusEl.value;
+    const valorVazio = $('sv-valor').value === '';
+    const pend = {
+      recepcao: !$('sv-relato').value.trim() || (tipo ? !resumoChecklist(tipo, checklist).completo : false),
+      tecnico: status !== 'Recebido' && !$('sv-diag').value.trim(),
+      orcamento: status === 'Aguardando aprovação' && valorVazio,
+      faturamento: ['Concluído', 'Entregue ao cliente'].includes(status) && !pago && !valorVazio,
+    };
+    container.querySelectorAll('.aba').forEach((b) => b.classList.toggle('pend', !!pend[b.dataset.aba]));
+  };
+
+  const atualizarLinks = () => {
+    $('lk-cliente-t').textContent = clienteById($('sv-cliente').value)?.nome ?? '—';
+    $('lk-equip-t').textContent = equipById($('sv-equip').value)?.nome ?? '—';
+    $('lk-entrada-t').textContent = fmtData($('sv-entrada').value) || '—';
+    $('lk-tec-t').textContent = $('sv-tec').value.trim() || '—';
+  };
+  const sairDaFicha = async (ir) => {
+    if (sujo && !(await confirmar('Alterações não salvas', 'Se sair agora, o que você digitou e não salvou será perdido.', 'Sair mesmo assim', true))) return;
+    ir();
+  };
+  $('lk-cliente').onclick = () => {
+    const c = clienteById($('sv-cliente').value);
+    if (!c) { abrirAba('recepcao'); return; }
+    sairDaFicha(() => { buscarCliente(c.nome); navigate('clientes'); });
+  };
+  $('lk-equip').onclick = () => {
+    const e = equipById($('sv-equip').value);
+    if (!e) { abrirAba('recepcao'); return; }
+    sairDaFicha(() => { buscarEquipamento(e.serie || e.nome); navigate('equipamentos'); });
+  };
+
+  const desenharFaturamento = () => {
+    const valor = num($('sv-valor').value);
+    $('fat-valor').textContent = valor === null ? '—' : formatBRL(valor);
+    const quando = $('sv-datapag').value ? ` em ${esc(fmtData($('sv-datapag').value))}` : '';
+    const forma = $('sv-forma').value ? ` · ${esc($('sv-forma').value)}` : '';
+    if (pago) $('fat-selo').innerHTML = `<span class="selo selo-pago">PAGO</span><small>${quando}${forma}</small>`;
+    else if (statusEl.value === 'Entregue ao cliente' && valor !== null) $('fat-selo').innerHTML = '<span class="selo selo-atraso">ENTREGUE E NÃO PAGO</span>';
+    else $('fat-selo').innerHTML = '<span class="selo selo-receber">A RECEBER</span>';
+    $('fat-acoes').innerHTML = pago
+      ? '<button type="button" class="btn-secondary" id="fat-desfazer">Desfazer pagamento</button>'
+      : '<button type="button" class="btn-small-primary btn-grande" id="fat-pagar">Marcar como pago</button>';
+    const pagar = $('fat-pagar');
+    if (pagar) pagar.onclick = () => {
+      if (num($('sv-valor').value) === null) { toast('Informe o valor cobrado na aba Orçamento primeiro.'); abrirAba('orcamento'); return; }
+      pago = true;
+      if (!$('sv-datapag').value) $('sv-datapag').value = hojeStr();
+      desenharFaturamento();
+      $('sv-salvar').click();
+    };
+    const desfazer = $('fat-desfazer');
+    if (desfazer) desfazer.onclick = async () => {
+      if (!(await confirmar('Desfazer o pagamento?', 'A O.S. volta a ficar como "a receber". A mudança fica registrada no histórico.', 'Desfazer', true))) return;
+      pago = false;
+      $('sv-datapag').value = '';
+      $('sv-forma').value = '';
+      desenharFaturamento();
+      $('sv-salvar').click();
+    };
+  };
+
+  const aoEditar = () => { marcarSujo(); atualizarLinks(); atualizarPendencias(); desenharFaturamento(); };
+  container.oninput = aoEditar;
+  container.onchange = aoEditar;
 
   /* ---- cliente / equipamento ---- */
   let equipId = s.equipamentoId;
@@ -288,6 +424,11 @@ export async function render(container, { param, navigate }) {
   };
   atualizarCalculos();
 
+  desenharEtapas();
+  atualizarLinks();
+  desenharFaturamento();
+  abrirAba(novo ? 'recepcao' : abaInicial(papel, s.status));
+
   /* ---- salvar ---- */
   $('sv-salvar').onclick = async (ev) => {
     const botao = ev.currentTarget;
@@ -307,7 +448,8 @@ export async function render(container, { param, navigate }) {
       relatoCliente: $('sv-relato').value.trim(), diagnostico: $('sv-diag').value.trim(),
       acoes: linhas($('sv-acoes').value), recomendacoes: linhas($('sv-recs').value),
       dataEntrada: $('sv-entrada').value, dataInicio: $('sv-inicio').value, previsaoEntrega: $('sv-previsao').value, dataConclusao: conclusao,
-      valorCobrado: num($('sv-valor').value), pago: $('sv-pago').checked, dataPagamento: $('sv-datapag').value,
+      valorCobrado: num($('sv-valor').value), pago, dataPagamento: $('sv-datapag').value, formaPagamento: $('sv-forma').value,
+      tecnicoResponsavel: $('sv-tec').value.trim(), pecas: $('sv-pecas').value.trim(),
       garantiaDias: num($('sv-garantia').value), garantiaObs: $('sv-garantia-obs').value.trim(),
       terceiro: $('sv-terc-on').checked ? lerTerceiro() : null, obs: $('sv-obs').value.trim(),
       checklist, senhaAcesso: senhaAcesso.trim(), checklistObs: $('chk-obs').value.trim(),
@@ -322,6 +464,7 @@ export async function render(container, { param, navigate }) {
       if (novo) navigate(`servico/${salvo.id}`);
       else {
         $('sv-conclusao').value = salvo.dataConclusao ?? ''; // data preenchida automaticamente ao concluir
+        desenharFaturamento();
         botao.disabled = false;
       }
     } catch (e) {

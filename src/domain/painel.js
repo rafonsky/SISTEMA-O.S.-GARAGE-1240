@@ -1,20 +1,20 @@
 import { totalAReceber } from './finance.js';
 import { precisaAtencao } from './prazo.js';
 import { normalizeSerial, semAcento } from './serial.js';
+import { filtrarServicos } from './grupos.js';
 
-const GRUPO_ANDAMENTO = ['Recebido', 'Em diagnóstico', 'Em andamento', 'Aguardando peça'];
 const PRIORIDADE = ['Prazo do terceiro estourado', 'Previsão de entrega vencida', 'Concluído e não pago'];
 
 export function resumoPainel(servicos, hoje) {
-  const conta = (lista) => servicos.filter((s) => lista.includes(s.status)).length;
+  const conta = (grupo) => filtrarServicos(servicos, { grupo }).length;
   const atencao = servicos
     .map((servico) => ({ servico, motivo: precisaAtencao(servico, hoje)?.motivo }))
     .filter((a) => a.motivo)
     .sort((a, b) => PRIORIDADE.indexOf(a.motivo) - PRIORIDADE.indexOf(b.motivo));
   return {
-    emAndamento: conta(GRUPO_ANDAMENTO),
-    noTerceiro: conta(['No terceiro']),
-    aguardandoAprovacao: conta(['Aguardando aprovação']),
+    emAndamento: conta('em-andamento'),
+    noTerceiro: conta('no-terceiro'),
+    aguardandoAprovacao: conta('aguardando-aprovacao'),
     aReceber: totalAReceber(servicos),
     atencao,
   };

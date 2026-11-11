@@ -3,6 +3,11 @@ import { esc, toast, openModal, closeModal, confirmar, semAcento } from '../ui.j
 
 let busca = '';
 
+// Usada pelos links da ficha do serviço: abre a lista já filtrada pelo cliente.
+export function definirBusca(texto) {
+  busca = texto;
+}
+
 export async function render(container) {
   container.innerHTML = `
     <div class="page-head"><div><h2>Clientes</h2><p id="cli-contagem"></p></div></div>
