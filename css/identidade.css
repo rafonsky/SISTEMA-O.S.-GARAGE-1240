@@ -1,0 +1,108 @@
+/* Identidade visual da empresa: petróleo e laranja, Figtree + JetBrains Mono, cantos grandes.
+   Carregada por último: redefine as variáveis do app.css/v2.css e ajusta formas, botões e rolagem.
+   Referência: o sistema de estilos do outro software da empresa. Cor de estado (verde/âmbar/vermelho)
+   não muda por gosto; o laranja fica para a identidade, e os botões de ação são azuis. */
+
+/* Fontes empacotadas no app (nada de Google Fonts): o sistema abre mesmo sem internet na bancada. */
+@font-face{
+  font-family:'Figtree Variable'; font-style:normal; font-weight:300 900; font-display:swap;
+  src:url('../assets/fonts/figtree-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face{
+  font-family:'Figtree Variable'; font-style:normal; font-weight:300 900; font-display:swap;
+  src:url('../assets/fonts/figtree-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range:U+0100-02AF,U+0304,U+0308,U+0329,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+@font-face{
+  font-family:'JetBrains Mono Variable'; font-style:normal; font-weight:100 800; font-display:swap;
+  src:url('../assets/fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
+:root{
+  --raio-grande:20px;  /* cartões, painéis, modais */
+  --raio-medio:10px;   /* botões, campos */
+  --raio-pill:999px;   /* selos e etiquetas */
+  --radius:10px;
+  --font-display:'Figtree Variable', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-body:'Figtree Variable', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono:'JetBrains Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --acao-1:#2f6fd0; --acao-2:#3d86e8;           /* botões de ação: azul, com gradiente sutil */
+  --atencao:#eab308;                              /* semáforo: atenção */
+}
+
+/* Escuro (padrão) */
+:root, :root[data-theme="dark"]{
+  --bg:#080c0f; --panel:#101820; --panel-2:#0c1319; --line:#1e2a34;
+  --text:#d6dee3; --text-dim:#7c8d99;
+  --amber:#ff7a1a; --amber-dim:#3d2210;           /* "amber" agora é o laranja da marca */
+  --teal:#22c55e; --teal-dim:#0f3a22;
+  --blue:#6fb2ff; --blue-dim:#14263f;
+  --danger:#ff5050; --danger-dim:#431a1a;
+}
+/* OLED: preto absoluto no fundo; as cores de estado são as do escuro */
+:root[data-theme="oled"]{
+  --bg:#000000; --panel:#070b0e; --panel-2:#000000; --line:#141c22;
+  --text:#d6dee3; --text-dim:#7c8d99;
+  --amber:#ff7a1a; --amber-dim:#3d2210;
+  --teal:#22c55e; --teal-dim:#0f3a22;
+  --blue:#6fb2ff; --blue-dim:#14263f;
+  --danger:#ff5050; --danger-dim:#431a1a;
+}
+/* Claro */
+:root[data-theme="light"]{
+  --bg:#eef2f4; --panel:#ffffff; --panel-2:#e3eaee; --line:#d4dde2;
+  --text:#0f1a21; --text-dim:#55646e;
+  --amber:#c2510f; --amber-dim:#fde4d3;           /* laranja escurecido para texto ter contraste no fundo claro */
+  --teal:#166534; --teal-dim:#dcf5e5;
+  --blue:#1a56c4; --blue-dim:#dde8fa;
+  --danger:#b91c1c; --danger-dim:#fde0e0;
+  --atencao:#92400e;
+}
+
+body, :root[data-theme="light"] body{ background-image:none; font-family:var(--font-body); }
+::selection{ background:var(--amber); color:#fff; }
+
+/* Cantos grandes nos blocos e cantos médios nos controles */
+.bloco, .cartao-painel, .modal, .ticket, .os-card, .item-atencao, .link-chip, .valor-card, .empty, table{ border-radius:var(--raio-grande); }
+.modal{ border-radius:var(--raio-grande); }
+input, select, textarea, .search-input, .select, .field input, .btn-ghost, .btn-secondary, .btn-small-primary, .btn-primary, .btn-danger-solid,
+.chk-op, .chip, .link-btn{ border-radius:var(--raio-medio); }
+.etapa, .papel-selo, .chip{ border-radius:var(--raio-pill); }
+.foto-img, .foto img{ border-radius:var(--raio-medio); }
+.selo{ border-radius:var(--raio-medio); }
+
+/* Botões de ação: azul com gradiente sutil (o laranja fica para a marca) */
+.btn-small-primary, .btn-primary{
+  background:linear-gradient(135deg, var(--acao-1), var(--acao-2)); color:#fff; border:none; font-weight:700;
+}
+.btn-small-primary:hover, .btn-primary:hover{ filter:brightness(1.08); }
+.btn-small-primary:disabled, .btn-primary:disabled{ opacity:.4; cursor:not-allowed; filter:none; }
+.btn-danger-solid{ background:linear-gradient(135deg, #a5312c, #c23c36); color:#fff; border:none; }
+.btn-secondary{ background:var(--panel-2); }
+
+/* Marca e seleção ativa em laranja */
+.dot{ background:var(--amber); }
+.login-wordmark .n-word, .side-item.active, .aba.ativa, .chip.ativo, .etapa.atual{ color:var(--amber); }
+.field input:focus, .search-input:focus, input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--amber); }
+
+/* Dados que alinham em coluna usam a fonte de dados */
+.os-id, .chk-prog, .fat-valor, .valor-card b, .cartao-painel b, .side-version, .selo, td b, .papel-selo{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+
+/* Barras de rolagem finas, arredondadas e discretas */
+*::-webkit-scrollbar{ width:10px; height:10px; }
+*::-webkit-scrollbar-track, *::-webkit-scrollbar-corner{ background:transparent; }
+*::-webkit-scrollbar-button{ display:none; width:0; height:0; }
+*::-webkit-scrollbar-thumb{
+  background-color:color-mix(in srgb, var(--text-dim) 38%, transparent); border:2px solid transparent; background-clip:content-box;
+  border-radius:999px; min-height:32px; min-width:32px;
+}
+*::-webkit-scrollbar-thumb:hover{ background-color:color-mix(in srgb, var(--text-dim) 62%, transparent); }
+*::-webkit-scrollbar-thumb:active{ background-color:var(--amber); }
+
+/* iPhone: campo com fonte menor que 16px faz o sistema dar zoom e deixar a tela torta. Regra de plataforma: vence o estilo do componente. */
+@media (max-width:720px){
+  input, select, textarea{ font-size:16px !important; }
+}
+#btn-tema-m{ text-transform:capitalize; }

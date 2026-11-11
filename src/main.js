@@ -7,11 +7,14 @@ import { esc } from './ui.js';
 const $app = document.getElementById('app');
 
 /* ---------- tema ---------- */
+const TEMAS = ['dark', 'light', 'oled'];
+const NOME_TEMA = { dark: 'escuro', light: 'claro', oled: 'OLED' };
 let tema = 'dark';
-try { tema = localStorage.getItem('g1240-theme') || 'dark'; } catch { /* ignora */ }
+try { const guardado = localStorage.getItem('g1240-theme'); if (TEMAS.includes(guardado)) tema = guardado; } catch { /* ignora */ }
+const proximoTema = () => TEMAS[(TEMAS.indexOf(tema) + 1) % TEMAS.length];
 const aplicarTema = () => document.documentElement.setAttribute('data-theme', tema);
 function alternarTema() {
-  tema = tema === 'dark' ? 'light' : 'dark';
+  tema = proximoTema();
   try { localStorage.setItem('g1240-theme', tema); } catch { /* ignora */ }
   aplicarTema();
   if (usuario) montarCasca();
@@ -70,7 +73,7 @@ function montarCasca() {
         <div class="side-foot">
           <div class="side-tec">${esc(usuario?.nome)}</div>
           <button class="btn-ghost" id="btn-tema" style="width:100%; margin-top:8px; display:flex; align-items:center; justify-content:center; gap:7px;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icone}</svg><span>${tema === 'dark' ? 'Tema claro' : 'Tema escuro'}</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icone}</svg><span>Tema ${NOME_TEMA[proximoTema()]}</span>
           </button>
           <button class="btn-ghost" id="btn-sair" style="width:100%; margin-top:8px;">Sair</button>
           <div class="side-version">v${APP_VERSION}</div>
@@ -79,7 +82,7 @@ function montarCasca() {
       <main class="main-area">
         <div class="topo-mobile">
           <span class="topo-marca">GARAGE 1240 <small>v${APP_VERSION}</small></span>
-          <span class="topo-acoes"><button class="btn-ghost" id="btn-tema-m" aria-label="Alternar tema">${tema === 'dark' ? 'Claro' : 'Escuro'}</button><button class="btn-ghost" id="btn-sair-m">Sair</button></span>
+          <span class="topo-acoes"><button class="btn-ghost" id="btn-tema-m" aria-label="Alternar tema">${NOME_TEMA[proximoTema()]}</button><button class="btn-ghost" id="btn-sair-m">Sair</button></span>
         </div>
         <div class="content" id="view"></div>
       </main>
