@@ -129,3 +129,8 @@
   .chk-linha{ flex-direction:column; align-items:stretch; gap:8px; }
   .chk-op{ flex:1; }
 }
+.chk-bloco{ border-bottom:1px solid var(--line); }
+.chk-bloco:last-child{ border-bottom:none; }
+.chk-bloco .chk-linha{ border-bottom:none; }
+.chk-campo{ padding:0 0 10px; }
+.chk-campo label{ display:block; font-size:12px; color:var(--text-dim); margin-bottom:4px; }

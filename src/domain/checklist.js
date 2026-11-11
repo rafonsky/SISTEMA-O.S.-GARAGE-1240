@@ -5,7 +5,6 @@ const COMUNS = [
   { id: 'liga', pergunta: 'O equipamento liga?' },
   { id: 'carcaca', pergunta: 'Carcaça sem riscos ou amassados?' },
   { id: 'fonte', pergunta: 'Acompanha fonte/carregador?' },
-  { id: 'cabo', pergunta: 'Acompanha cabo de força?' },
 ];
 
 const INFORMATICA = [
@@ -14,15 +13,14 @@ const INFORMATICA = [
   { id: 'bateria', pergunta: 'Bateria presente?' },
   { id: 'parafusos', pergunta: 'Parafusos completos e tampa fechada?' },
   { id: 'armazenamento', pergunta: 'HD/SSD e memória presentes?' },
-  { id: 'senha', pergunta: 'O cliente informou a senha de acesso?' },
+  // "campo": além do Sim/Não, a pergunta tem um espaço para digitar (guardado no campo indicado da O.S.).
+  { id: 'senha', pergunta: 'O cliente informou a senha de acesso?', campo: { nome: 'senhaAcesso', rotulo: 'Senha, PIN ou padrão de desbloqueio' } },
   { id: 'dados', pergunta: 'Cliente avisado do risco aos dados (backup)?' },
 ];
 
 const OUTROS = [
   { id: 'imagem-som', pergunta: 'Imagem e som funcionam ao ligar?' },
   { id: 'conectores', pergunta: 'Entradas e conectores sem danos?' },
-  { id: 'controle', pergunta: 'Acompanha controle remoto?' },
-  { id: 'acessorios', pergunta: 'Cabos e acessórios conferidos e anotados?' },
 ];
 
 const FECHAMENTO = [{ id: 'cliente-ciente', pergunta: 'Cliente conferiu e concordou com o estado registrado?' }];

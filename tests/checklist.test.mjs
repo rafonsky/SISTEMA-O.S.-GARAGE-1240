@@ -14,6 +14,16 @@ test('informática e outros equipamentos têm perguntas próprias, e cada pergun
   }
 });
 
+test('ajustes do dono: sem cabo de força, controle remoto e cabos/acessórios; a senha tem campo para digitar', () => {
+  const todos = [...itensPara('informatica'), ...itensPara('outros')].map((i) => i.id);
+  for (const removido of ['cabo', 'controle', 'acessorios']) assert.ok(!todos.includes(removido), removido);
+  assert.ok(todos.includes('fonte'));
+  const senha = itensPara('informatica').find((i) => i.id === 'senha');
+  assert.equal(senha.campo.nome, 'senhaAcesso');
+  assert.ok(senha.campo.rotulo.length > 0);
+  assert.equal(itensPara('informatica').filter((i) => i.campo).length, 1);
+});
+
 test('tipo desconhecido usa a lista de "outros"', () => {
   assert.deepEqual(itensPara('qualquer'), itensPara('outros'));
 });

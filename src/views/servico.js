@@ -14,6 +14,7 @@ const LABELS = {
   recomendacoes: 'Recomendações', dataEntrada: 'Data de entrada', dataInicio: 'Início do serviço', previsaoEntrega: 'Previsão',
   dataConclusao: 'Conclusão', valorCobrado: 'Valor cobrado', pago: 'Pago', dataPagamento: 'Data do pagamento',
   garantiaDias: 'Garantia (dias)', garantiaObs: 'Condições da garantia', obs: 'Observação interna',
+  senhaAcesso: 'Senha de acesso', checklistObs: 'Conferência de entrada (observação)',
   clienteId: 'Cliente', equipamentoId: 'Equipamento', 'terceiro.custo': 'Custo do terceiro', 'terceiro.nome': 'Terceiro',
 };
 
@@ -186,9 +187,17 @@ export async function render(container, { param, navigate }) {
 
   /* ---- conferência de entrada: numa O.S. já criada, cada toque é salvo na hora ---- */
   let checklist = { ...(s.checklist ?? {}) };
+  let senhaAcesso = s.senhaAcesso ?? '';
   let estadoChk = '';
   let timerChk = null;
   const tipoAtual = () => equipById($('sv-equip').value)?.tipo ?? null;
+  const atualizarProgresso = () => {
+    const el = document.getElementById('chk-prog');
+    const tipo = tipoAtual();
+    if (!el || !tipo) return;
+    const r = resumoChecklist(tipo, checklist);
+    el.textContent = `${r.respondidos}/${r.total} respondidas${estadoChk ? ` · ${estadoChk}` : ''}`;
+  };
   const desenharChecklist = () => {
     const alvo = document.getElementById('chk-lista');
     if (!alvo) return;
@@ -198,30 +207,38 @@ export async function render(container, { param, navigate }) {
       $('chk-prog').textContent = '';
       return;
     }
-    const r = resumoChecklist(tipo, checklist);
-    $('chk-prog').textContent = `${r.respondidos}/${r.total} respondidas${estadoChk ? ` · ${estadoChk}` : ''}`;
+    atualizarProgresso();
     alvo.innerHTML = itensPara(tipo).map((i) => {
       const v = checklist[i.id];
       const botoes = [['sim', 'Sim'], ['nao', 'Não'], ['na', 'N/A']].map(([k, rot]) =>
         `<button type="button" class="chk-op ${k}" data-i="${esc(i.id)}" data-v="${k}" aria-pressed="${v === k}">${rot}</button>`).join('');
-      return `<div class="chk-linha ${v ? '' : 'pend'}"><span class="chk-pergunta">${esc(i.pergunta)}</span><span class="chk-opcoes">${botoes}</span></div>`;
+      const campo = i.campo
+        ? `<div class="chk-campo"><label for="chk-campo-${esc(i.id)}">${esc(i.campo.rotulo)}</label><input type="text" id="chk-campo-${esc(i.id)}" data-campo="${esc(i.campo.nome)}" value="${esc(senhaAcesso)}" autocomplete="off" style="font-family:var(--font-body);"></div>`
+        : '';
+      return `<div class="chk-bloco"><div class="chk-linha ${v ? '' : 'pend'}"><span class="chk-pergunta">${esc(i.pergunta)}</span><span class="chk-opcoes">${botoes}</span></div>${campo}</div>`;
     }).join('');
     alvo.querySelectorAll('.chk-op').forEach((b) => (b.onclick = () => tocarChecklist(b.dataset.i, b.dataset.v)));
+    alvo.querySelectorAll('[data-campo]').forEach((inp) => (inp.oninput = () => { senhaAcesso = inp.value; agendarSalvarChecklist(); }));
   };
   const salvarChecklist = async () => {
     try {
-      const salvo = await repo.saveServico({ ...servicoById(s.id), checklist });
+      const salvo = await repo.saveServico({ ...servicoById(s.id), checklist, senhaAcesso });
       guardarLocal('servicos', salvo);
       estadoChk = 'salvo';
     } catch (e) {
       estadoChk = 'não foi salvo';
       toast(`Não foi possível salvar a conferência: ${e.message}`);
     }
-    desenharChecklist();
+    atualizarProgresso();
+  };
+  // Numa O.S. já criada, salva sozinho meio segundo depois do último toque ou letra digitada.
+  const agendarSalvarChecklist = () => {
+    if (novo) { marcarSujo(); estadoChk = ''; } else { estadoChk = 'salvando…'; clearTimeout(timerChk); timerChk = setTimeout(salvarChecklist, 500); }
+    atualizarProgresso();
   };
   const tocarChecklist = (id, valor) => {
     checklist = definirResposta(checklist, id, valor);
-    if (novo) { marcarSujo(); estadoChk = ''; } else { estadoChk = 'salvando…'; clearTimeout(timerChk); timerChk = setTimeout(salvarChecklist, 500); }
+    agendarSalvarChecklist();
     desenharChecklist();
   };
 
@@ -293,7 +310,7 @@ export async function render(container, { param, navigate }) {
       valorCobrado: num($('sv-valor').value), pago: $('sv-pago').checked, dataPagamento: $('sv-datapag').value,
       garantiaDias: num($('sv-garantia').value), garantiaObs: $('sv-garantia-obs').value.trim(),
       terceiro: $('sv-terc-on').checked ? lerTerceiro() : null, obs: $('sv-obs').value.trim(),
-      checklist, checklistObs: $('chk-obs').value.trim(),
+      checklist, senhaAcesso: senhaAcesso.trim(), checklistObs: $('chk-obs').value.trim(),
     };
     botao.disabled = true;
     try {
@@ -352,7 +369,7 @@ export async function render(container, { param, navigate }) {
         const quando = new Date(l.em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
         const verbo = { criar: 'criou', editar: 'editou', excluir: 'excluiu', migrar: 'migrou' }[l.acao] ?? l.acao;
         const mud = l.acao === 'editar'
-          ? (l.mudancas ?? []).slice(0, 6).map((m) => `<div class="log-mud">${esc(rotuloCampo(m.campo))}: <s>${esc(resumo(m.antes))}</s> → ${esc(resumo(m.depois))}</div>`).join('')
+          ? (l.mudancas ?? []).slice(0, 6).map((m) => `<div class="log-mud">${esc(rotuloCampo(m.campo))}: <s>${esc(valorDoLog(m.campo, m.antes))}</s> → ${esc(valorDoLog(m.campo, m.depois))}</div>`).join('')
           : '';
         return `<div class="log-item"><b>${esc(quando)}</b> — ${esc(l.por?.nome)} ${verbo}${mud}</div>`;
       }).join('');
@@ -368,8 +385,14 @@ function rotuloCampo(campo) {
   return LABELS[campo] ?? campo;
 }
 
+// No histórico a senha nunca aparece por extenso: só se foi preenchida ou apagada.
+function valorDoLog(campo, v) {
+  if (campo === 'senhaAcesso') return v ? '••••' : '(vazio)';
+  if (campo.startsWith('checklist.') && RESPOSTA_ROTULO[v]) return RESPOSTA_ROTULO[v];
+  return resumo(v);
+}
+
 function resumo(v) {
-  if (RESPOSTA_ROTULO[v]) return RESPOSTA_ROTULO[v];
   if (v === null || v === undefined || v === '') return '(vazio)';
   if (typeof v === 'boolean') return v ? 'sim' : 'não';
   if (Array.isArray(v)) return `${v.length} item(ns)`;
