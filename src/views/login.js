@@ -4,39 +4,51 @@ import { APP_VERSION } from '../version.js';
 
 export function renderLogin($app, { aviso, alternarTema }) {
   $app.innerHTML = `
-    <div class="login-wrap">
-      <form class="ticket" id="form-login" novalidate>
-        <div class="ticket-head">
-          <span class="login-wordmark"><span class="g-word">GARAGE</span> <span class="n-word">1240</span><small>Computadores &amp; Audiovisual</small></span>
-          <h1>Ordens de serviço</h1>
-          <p>Acesso restrito à equipe.</p>
-        </div>
-        <div class="ticket-body">
+    <div class="entrada">
+      <aside class="entrada-marca" aria-hidden="true">
+        <div class="entrada-brilho"></div>
+        <div class="entrada-selo"><span>G</span></div>
+        <div class="entrada-nome">GARAGE<b>1240</b></div>
+        <p class="entrada-frase">Computadores &amp; Audiovisual</p>
+        <div class="entrada-rodape"><span>Portal de O.S.</span><span>v${APP_VERSION}</span></div>
+      </aside>
+
+      <main class="entrada-form">
+        <form class="entrada-cartao" id="form-login" novalidate>
+          <div class="entrada-selo entrada-selo-mini"><span>G</span></div>
+          <h1>Entrar</h1>
+          <p class="entrada-sub">Acesso restrito à equipe da Garage 1240.</p>
+
           <div class="field"><label for="l-email">E-mail</label>
-            <input type="email" id="l-email" autocomplete="username" inputmode="email" style="font-family:var(--font-body);"></div>
+            <input type="email" id="l-email" autocomplete="username" inputmode="email" placeholder="voce@garage1240.com"></div>
           <div class="field"><label for="l-senha">Senha</label>
-            <input type="password" id="l-senha" autocomplete="current-password" style="font-family:var(--font-body);">
-            <label class="mostrar-senha" for="l-mostrar" style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:14px; cursor:pointer;">
-              <input type="checkbox" id="l-mostrar" style="width:auto; margin:0;"> Mostrar senha
-            </label>
+            <div class="entrada-senha">
+              <input type="password" id="l-senha" autocomplete="current-password" placeholder="••••••••">
+              <button type="button" class="entrada-olho" id="l-mostrar" aria-pressed="false">Mostrar</button>
+            </div>
           </div>
           <button class="btn-primary" type="submit" id="l-entrar">Entrar</button>
           <div class="err" id="l-erro" role="alert">${esc(aviso)}</div>
-          <div class="hint" style="display:flex; justify-content:space-between;">
+          <div class="entrada-pe">
             <span>v${APP_VERSION}</span><button type="button" class="link-btn" id="l-tema">Alternar tema</button>
           </div>
-        </div>
-      </form>
+        </form>
+      </main>
     </div>`;
   const erro = document.getElementById('l-erro');
-  document.getElementById('l-mostrar').onchange = (e) => {
-    document.getElementById('l-senha').type = e.target.checked ? 'text' : 'password';
+  const campoSenha = document.getElementById('l-senha');
+  const olho = document.getElementById('l-mostrar');
+  olho.onclick = () => {
+    const mostrar = campoSenha.type === 'password';
+    campoSenha.type = mostrar ? 'text' : 'password';
+    olho.textContent = mostrar ? 'Ocultar' : 'Mostrar';
+    olho.setAttribute('aria-pressed', String(mostrar));
   };
   document.getElementById('l-tema').onclick = alternarTema;
   document.getElementById('form-login').onsubmit = async (e) => {
     e.preventDefault();
     const email = document.getElementById('l-email').value;
-    const senha = document.getElementById('l-senha').value;
+    const senha = campoSenha.value;
     const botao = document.getElementById('l-entrar');
     erro.textContent = '';
     if (!email.trim() || !senha) { erro.textContent = 'Preencha e-mail e senha.'; return; }
