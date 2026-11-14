@@ -16,5 +16,6 @@ Reconstrução do sistema como aplicativo interno da Garage 1240 (dono e sócio)
 - Relatório de serviço em PDF para o cliente, sem custo nem margem; no celular abre o compartilhamento.
 - Tela de conferência de dados.
 - Migração dos dados do sistema anterior (com ensaio e relatório de pendências); backup em pasta separada.
+- Identidade visual própria: paleta petróleo e laranja, fontes Figtree e JetBrains Mono, temas escuro, claro e OLED, nova tela de entrada e logo (monitor com prompt) no login, menu, ícone do app e PDF.
 - Instalável no celular (PWA) e layout pensado primeiro para o computador.
 - Removido o portal do cliente e o login por PIN do sistema anterior (voltam, de forma segura, numa fase futura).

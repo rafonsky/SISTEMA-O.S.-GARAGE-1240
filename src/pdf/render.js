@@ -6,7 +6,7 @@ const LARGURA = 210;
 const ALTURA = 297;
 const DIREITA = LARGURA - MARGEM;
 const RESERVA_RODAPE = 34;
-const AMBAR = [224, 99, 26]; // laranja da marca
+const AMBAR = [255, 122, 26]; // laranja da marca
 const CINZA = [110, 110, 110];
 
 // Quebra o texto (em negrito, 11 pt) em linhas que cabem na largura da coluna.
