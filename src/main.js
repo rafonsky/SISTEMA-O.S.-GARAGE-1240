@@ -3,6 +3,7 @@ import { store, subscribeAll, aguardarDados } from './data/store.js';
 import { renderLogin } from './views/login.js';
 import { APP_VERSION } from './version.js';
 import { esc } from './ui.js';
+import { iconeMarca } from './marca.js';
 
 const $app = document.getElementById('app');
 
@@ -60,7 +61,7 @@ function montarCasca() {
   $app.innerHTML = `
     <div class="app-shell">
       <nav class="sidebar">
-        <div class="side-brand"><div class="dot"></div>
+        <div class="side-brand">${iconeMarca(30)}
           <div class="side-brand-text">GARAGE 1240<small>Ordens de serviço</small></div>
         </div>
         <div class="side-nav">
@@ -81,7 +82,7 @@ function montarCasca() {
       </nav>
       <main class="main-area">
         <div class="topo-mobile">
-          <span class="topo-marca">GARAGE 1240 <small>v${APP_VERSION}</small></span>
+          <span class="topo-marca">${iconeMarca(22)}GARAGE 1240 <small>v${APP_VERSION}</small></span>
           <span class="topo-acoes"><button class="btn-ghost" id="btn-tema-m" aria-label="Alternar tema">${NOME_TEMA[proximoTema()]}</button><button class="btn-ghost" id="btn-sair-m">Sair</button></span>
         </div>
         <div class="content" id="view"></div>

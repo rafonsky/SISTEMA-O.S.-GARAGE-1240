@@ -1,13 +1,14 @@
 import { signIn } from '../auth.js';
 import { esc } from '../ui.js';
 import { APP_VERSION } from '../version.js';
+import { iconeMarca } from '../marca.js';
 
 export function renderLogin($app, { aviso, alternarTema }) {
   $app.innerHTML = `
     <div class="entrada">
       <aside class="entrada-marca" aria-hidden="true">
         <div class="entrada-brilho"></div>
-        <div class="entrada-selo"><span>G</span></div>
+        <div class="entrada-selo">${iconeMarca(88)}</div>
         <div class="entrada-nome">GARAGE<b>1240</b></div>
         <p class="entrada-frase">Informática e Audiovisual</p>
         <div class="entrada-rodape"><span>Portal de O.S.</span><span>v${APP_VERSION}</span></div>
@@ -15,7 +16,7 @@ export function renderLogin($app, { aviso, alternarTema }) {
 
       <main class="entrada-form">
         <form class="entrada-cartao" id="form-login" novalidate>
-          <div class="entrada-selo entrada-selo-mini"><span>G</span></div>
+          <div class="entrada-selo entrada-selo-mini">${iconeMarca(48)}</div>
           <h1>Entrar</h1>
           <p class="entrada-sub">Acesso restrito à equipe da Garage 1240.</p>
 

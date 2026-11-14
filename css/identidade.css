@@ -122,13 +122,11 @@ input, select, textarea, .search-input, .select, .field input, .btn-ghost, .btn-
   background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
   background-size:56px 56px; -webkit-mask-image: radial-gradient(circle at 20% 30%, #000, transparent 70%); mask-image: radial-gradient(circle at 20% 30%, #000, transparent 70%);
 }
-.entrada-selo{
-  position:relative; width:64px; height:64px; border-radius:20px; display:grid; place-items:center;
-  background:linear-gradient(145deg,#ff9a4a,#ff7a1a 55%,#e0560a); box-shadow:0 10px 30px rgba(255,122,26,.35);
-}
-.entrada-selo span{ font-family:var(--font-display); font-weight:800; font-size:34px; color:#10161b; line-height:1; }
-.entrada-selo-mini{ display:none; width:48px; height:48px; border-radius:15px; margin-bottom:18px; }
-.entrada-selo-mini span{ font-size:26px; }
+.entrada-selo{ position:relative; width:88px; height:88px; color:var(--text); }
+.entrada-selo svg{ display:block; width:100%; height:100%; }
+.entrada-selo-mini{ display:none; width:48px; height:48px; margin-bottom:18px; }
+.marca-icone{ flex:none; color:var(--text); }
+.topo-marca{ display:inline-flex; align-items:center; gap:8px; }
 .entrada-nome{ position:relative; font-family:var(--font-display); font-weight:800; font-size:clamp(44px,5.4vw,76px); letter-spacing:-.02em; line-height:1; color:var(--text); }
 .entrada-nome b{ margin-left:.22em; font-family:var(--font-mono); font-weight:700; color:var(--amber); letter-spacing:-.04em; }
 .entrada-frase{ position:relative; margin:0; font-size:18px; color:var(--text-dim); }
