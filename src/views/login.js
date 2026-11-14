@@ -9,7 +9,7 @@ export function renderLogin($app, { aviso, alternarTema }) {
         <div class="entrada-brilho"></div>
         <div class="entrada-selo"><span>G</span></div>
         <div class="entrada-nome">GARAGE<b>1240</b></div>
-        <p class="entrada-frase">Computadores &amp; Audiovisual</p>
+        <p class="entrada-frase">Informática e Audiovisual</p>
         <div class="entrada-rodape"><span>Portal de O.S.</span><span>v${APP_VERSION}</span></div>
       </aside>
 

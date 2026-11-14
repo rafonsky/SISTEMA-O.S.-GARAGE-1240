@@ -38,7 +38,7 @@ export function renderRelatorioPDF(modelo, { jsPDF, logoDataUrl } = {}) {
     doc.addImage(logoDataUrl, 'PNG', MARGEM, 10, 52, (52 * 183) / 669);
   } else {
     texto('GARAGE 1240', MARGEM, 18, { tamanho: 18, negrito: true });
-    texto('Computadores & Audiovisual', MARGEM, 23, { tamanho: 8, cor: CINZA });
+    texto('Informática e Audiovisual', MARGEM, 23, { tamanho: 8, cor: CINZA });
   }
   texto(modelo.titulo, DIREITA, 14, { tamanho: 9, cor: CINZA, alinhar: 'right' });
   texto(modelo.numero, DIREITA, 21, { tamanho: 14, negrito: true, alinhar: 'right' });
