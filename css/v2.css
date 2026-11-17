@@ -195,3 +195,9 @@ tr.linha-link:hover td, tr.linha-link:focus-visible td{ background:var(--panel-2
 .fotos-botoes{ display:flex; flex-wrap:wrap; gap:10px; }
 .foto-btn{ display:inline-flex; align-items:center; justify-content:center; min-height:44px; cursor:pointer; }
 @media (max-width:520px){ .foto-btn{ flex:1; } }
+
+/* setas anterior/próxima na ficha da O.S. */
+.titulo-os{ display:flex; align-items:center; gap:10px; }
+.seta-os{ width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:20px; line-height:1; cursor:pointer; display:grid; place-items:center; padding:0 0 2px; }
+.seta-os:hover:not(:disabled){ border-color:var(--amber); color:var(--amber); }
+.seta-os:disabled{ opacity:.35; cursor:default; }

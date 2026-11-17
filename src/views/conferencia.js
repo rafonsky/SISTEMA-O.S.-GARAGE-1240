@@ -1,5 +1,6 @@
 import { store } from '../data/store.js';
 import { esc } from '../ui.js';
+import { definirFila } from '../domain/vizinhos.js';
 import { findInconsistencias, ROTULOS_INCONSISTENCIA } from '../domain/inconsistencias.js';
 
 export async function render(container, { navigate }) {
@@ -35,6 +36,10 @@ function desenhar(navigate) {
     </div>`).join('');
   alvo.querySelectorAll('[data-id]').forEach((b) => (b.onclick = () => {
     const servico = ['servico-sem-equipamento', 'concluido-sem-valor', 'terceiro-sem-prazo', 'data-invalida'].includes(b.dataset.tipo);
+    if (servico) {
+      const tiposDeServico = Object.keys(ROTULOS_INCONSISTENCIA).filter((t) => ['servico-sem-equipamento', 'concluido-sem-valor', 'terceiro-sem-prazo', 'data-invalida'].includes(t));
+      definirFila([...new Set(grupos.filter((g) => tiposDeServico.includes(g.tipo)).flatMap((g) => g.lista.map((i) => i.id)))]);
+    }
     navigate(servico ? `servico/${b.dataset.id}` : 'equipamentos');
   }));
 }

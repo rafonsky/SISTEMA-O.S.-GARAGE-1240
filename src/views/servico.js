@@ -12,6 +12,7 @@ import { enviarFoto, apagarArquivo } from '../data/fotos.js';
 import { MAX_FOTOS, removerFoto } from '../domain/fotos.js';
 import { definirBusca as buscarEquipamento } from './equipamentos.js';
 import { definirBusca as buscarCliente } from './clientes.js';
+import { vizinhos, filaAtual } from '../domain/vizinhos.js';
 
 let pararLog = null;
 let atualizarFotosDeFora = null;
@@ -71,7 +72,7 @@ export async function render(container, { param, navigate }) {
 
   container.innerHTML = `
     <div class="page-head">
-      <div><h2>${novo ? 'Novo serviço' : esc(s.id)}</h2><p id="sv-sub"></p></div>
+      <div><h2 class="titulo-os">${novo ? 'Novo serviço' : `<button type="button" class="seta-os" id="sv-ant" aria-label="O.S. anterior" title="O.S. anterior">‹</button>${esc(s.id)}<button type="button" class="seta-os" id="sv-prox" aria-label="Próxima O.S." title="Próxima O.S.">›</button>`}</h2><p id="sv-sub"></p></div>
       <div class="acoes-topo">
         <span class="hint" id="sv-sujo" style="margin:0; align-self:center; color:var(--amber); display:none;">Alterações não salvas</span>
         ${novo ? '' : '<button class="btn-secondary" id="sv-qr">QR para o celular</button><button class="btn-secondary" id="sv-pdf">Gerar relatório (PDF)</button><button class="btn-secondary row-btn-danger" id="sv-excluir">Excluir</button>'}
@@ -420,6 +421,13 @@ export async function render(container, { param, navigate }) {
     if (sujo && !(await confirmar('Alterações não salvas', 'Se sair agora, o que você digitou e não salvou será perdido.', 'Sair mesmo assim', true))) return;
     ir();
   };
+  if (!novo) {
+    const { anterior, proxima } = vizinhos(store.servicos, s.id, filaAtual());
+    for (const [el, id] of [[$('sv-ant'), anterior], [$('sv-prox'), proxima]]) {
+      el.disabled = !id;
+      el.onclick = () => id && sairDaFicha(() => navigate(`servico/${id}`));
+    }
+  }
   $('lk-cliente').onclick = () => {
     const c = clienteById($('sv-cliente').value);
     if (!c) { abrirAba('recepcao'); return; }
