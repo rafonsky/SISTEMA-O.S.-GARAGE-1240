@@ -5,6 +5,7 @@ import { APP_VERSION } from './version.js';
 import { esc } from './ui.js';
 import { iconeMarca } from './marca.js';
 import { definirFila } from './domain/vizinhos.js';
+import { definirFoco } from './domain/foco.js';
 
 const $app = document.getElementById('app');
 
@@ -100,6 +101,7 @@ function montarCasca() {
 async function mostrarRota() {
   const { nome, param } = rotaAtual();
   $app.querySelectorAll('[data-rota]').forEach((b) => b.classList.toggle('active', b.dataset.rota === nome));
+  if (nome !== 'equipamentos') definirFoco(null);
   if (nome !== 'servico' && nome !== 'conferencia') definirFila(null); // a fila da Conferência não vale em outras telas
   const view = document.getElementById('view');
   if (!view) return;

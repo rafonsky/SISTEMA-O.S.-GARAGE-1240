@@ -15,7 +15,7 @@ export const ROTULOS_INCONSISTENCIA = {
 
 export function findInconsistencias({ clientes, equipamentos, servicos }) {
   const lista = [];
-  const add = (tipo, id, mensagem) => lista.push({ tipo, id, mensagem });
+  const add = (tipo, id, mensagem, extra = {}) => lista.push({ tipo, id, mensagem, ...extra });
   const equipIds = new Set(equipamentos.map((e) => e.id));
   const clienteIds = new Set(clientes.map((c) => c.id));
 
@@ -33,11 +33,11 @@ export function findInconsistencias({ clientes, equipamentos, servicos }) {
 
   const vistos = new Map();
   for (const e of equipamentos) {
-    if (!clienteIds.has(e.clienteId)) add('equipamento-sem-cliente', e.id, `${e.nome} aponta para um cliente que não existe.`);
+    if (!clienteIds.has(e.clienteId)) add('equipamento-sem-cliente', e.id, `${e.nome} aponta para um cliente que não existe.`, { equipamentoIds: [e.id] });
     const serie = normalizeSerial(e.serie);
     const chave = `${e.clienteId}|${serie ? `s:${serie}` : `n:${normalizeNome(e.nome)}|p:${normalizeNome(e.patrimonio)}`}`;
     if (vistos.has(chave)) {
-      add('equipamento-duplicado', e.id, `${e.nome} parece repetido (já existe ${vistos.get(chave).nome}).`);
+      add('equipamento-duplicado', e.id, `${e.nome} parece repetido (já existe ${vistos.get(chave).nome}).`, { equipamentoIds: [vistos.get(chave).id, e.id] });
     } else {
       vistos.set(chave, e);
     }

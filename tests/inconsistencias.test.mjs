@@ -73,3 +73,17 @@ test('FINAL: mesmo nome com patrimônios diferentes não é duplicata; mesmo nom
   const dups = findInconsistencias(d).filter((i) => i.tipo === 'equipamento-duplicado').map((i) => i.id);
   assert.deepEqual(dups, ['c']);
 });
+
+test('duplicado informa os dois equipamentos do par (o original e o repetido)', () => {
+  const d = limpo();
+  d.equipamentos.push({ id: 'e2', clienteId: 'c1', nome: 'Outro', tipo: 'outros', serie: 'abc-1', serieNorm: 'ABC1' });
+  const [dup] = findInconsistencias(d).filter((i) => i.tipo === 'equipamento-duplicado');
+  assert.deepEqual(dup.equipamentoIds, ['e1', 'e2']);
+});
+
+test('equipamento sem cliente informa apenas ele mesmo', () => {
+  const d = limpo();
+  d.equipamentos[0].clienteId = 'fantasma';
+  const [item] = findInconsistencias(d).filter((i) => i.tipo === 'equipamento-sem-cliente');
+  assert.deepEqual(item.equipamentoIds, ['e1']);
+});

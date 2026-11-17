@@ -2,6 +2,8 @@ import { store, repo, servicoById } from '../data/store.js';
 import { esc, toast, hojeStr } from '../ui.js';
 import { aplicarCobranca, FORMAS_PAGAMENTO } from '../domain/cobranca.js';
 import { definirFila } from '../domain/vizinhos.js';
+import { definirFoco } from '../domain/foco.js';
+import { definirBusca } from './equipamentos.js';
 import { findInconsistencias, ROTULOS_INCONSISTENCIA } from '../domain/inconsistencias.js';
 
 export async function render(container, { navigate }) {
@@ -44,6 +46,11 @@ function desenhar(navigate) {
     if (servico) {
       const tiposDeServico = Object.keys(ROTULOS_INCONSISTENCIA).filter((t) => ['servico-sem-equipamento', 'concluido-sem-valor', 'terceiro-sem-prazo', 'data-invalida'].includes(t));
       definirFila([...new Set(grupos.filter((g) => tiposDeServico.includes(g.tipo)).flatMap((g) => g.lista.map((i) => i.id)))]);
+    }
+    if (!servico) {
+      const item = itens.find((i) => i.tipo === b.dataset.tipo && i.id === b.dataset.id);
+      definirBusca(''); // zera busca e filtros antigos, senão o par pode ficar escondido
+      definirFoco(item?.equipamentoIds ?? null);
     }
     navigate(servico ? `servico/${b.dataset.id}` : 'equipamentos');
   }));

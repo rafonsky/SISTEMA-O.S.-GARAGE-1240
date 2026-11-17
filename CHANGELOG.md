@@ -2,6 +2,10 @@
 
 Formato `v2.X.Y`: correção pequena sobe o último número; função nova sobe o do meio; mudança grande no jeito de guardar os dados sobe o primeiro.
 
+## v2.2.1 — em preparação
+
+- Conferência: Abrir num equipamento repetido (ou sem cliente) já mostra só os equipamentos apontados em Equipamentos, com o botão Ver todos.
+
 ## v2.2.0 — 17/11/2026
 
 - Conferência: os serviços concluídos sem valor ganham valor, forma de pagamento e os botões Pago e Salvar valor na própria linha, sem abrir a ficha.

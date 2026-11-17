@@ -6,6 +6,7 @@ import { findDuplicateEquip } from '../domain/validators.js';
 import { normalizeSerial } from '../domain/serial.js';
 import { TIPOS_EQUIPAMENTO, rotuloStatus } from '../domain/status.js';
 import { abrirFormCliente } from './clientes.js';
+import { definirFoco, focoAtual } from '../domain/foco.js';
 
 const filtros = { q: '', cliente: '', tipo: '' };
 
@@ -14,6 +15,7 @@ export function definirBusca(texto) {
   filtros.q = texto;
   filtros.cliente = '';
   filtros.tipo = '';
+  definirFoco(null);
 }
 
 export async function render(container, { navigate }) {
@@ -29,9 +31,9 @@ export async function render(container, { navigate }) {
       <button class="btn-small-primary" id="eq-novo">+ Novo equipamento</button>
     </div>
     <div id="eq-tabela"></div>`;
-  document.getElementById('eq-busca').oninput = (e) => { filtros.q = e.target.value; desenharTabela(navigate); };
-  document.getElementById('eq-f-cliente').onchange = (e) => { filtros.cliente = e.target.value; desenharTabela(navigate); };
-  document.getElementById('eq-f-tipo').onchange = (e) => { filtros.tipo = e.target.value; desenharTabela(navigate); };
+  document.getElementById('eq-busca').oninput = (e) => { filtros.q = e.target.value; definirFoco(null); desenharTabela(navigate); };
+  document.getElementById('eq-f-cliente').onchange = (e) => { filtros.cliente = e.target.value; definirFoco(null); desenharTabela(navigate); };
+  document.getElementById('eq-f-tipo').onchange = (e) => { filtros.tipo = e.target.value; definirFoco(null); desenharTabela(navigate); };
   document.getElementById('eq-novo').onclick = () => abrirFormEquipamento(null, filtros.cliente || store.clientes[0]?.id || '');
   desenharTabela(navigate);
 }
@@ -41,16 +43,22 @@ export function update(container, { navigate }) {
 }
 
 function desenharTabela(navigate) {
+  const foco = focoAtual();
   const q = semAcento(filtros.q);
   const qSerie = normalizeSerial(filtros.q);
   const lista = store.equipamentos
     .filter((e) => {
       const texto = semAcento([e.nome, e.serie, e.patrimonio, e.marca, e.modelo, clienteById(e.clienteId)?.nome].join(' '));
       const achou = !q || texto.includes(q) || (qSerie && (e.serieNorm ?? '').includes(qSerie));
+      if (foco && !foco.includes(e.id)) return false;
       return achou &&(!filtros.cliente || e.clienteId === filtros.cliente) && (!filtros.tipo || e.tipo === filtros.tipo);
     })
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  document.getElementById('eq-contagem').textContent = `${lista.length} de ${store.equipamentos.length} equipamento(s)`;
+  document.getElementById('eq-contagem').innerHTML = foco
+    ? `Mostrando só os ${lista.length} apontados pela Conferência. <button type="button" class="link-btn" id="eq-ver-todos">Ver todos</button>`
+    : `${lista.length} de ${store.equipamentos.length} equipamento(s)`;
+  const verTodos = document.getElementById('eq-ver-todos');
+  if (verTodos) verTodos.onclick = () => { definirFoco(null); desenharTabela(navigate); };
   const alvo = document.getElementById('eq-tabela');
   if (!lista.length) { alvo.innerHTML = '<div class="empty">Nenhum equipamento encontrado.</div>'; return; }
   alvo.innerHTML = `
