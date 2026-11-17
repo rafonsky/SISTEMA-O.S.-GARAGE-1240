@@ -2,7 +2,7 @@
 
 Formato `v2.X.Y`: correção pequena sobe o último número; função nova sobe o do meio; mudança grande no jeito de guardar os dados sobe o primeiro.
 
-## v2.3.1 — em preparação
+## v2.3.1 — 17/11/2026
 
 - Novo serviço: botão + Cadastrar novo cliente ao lado do cliente. Ao salvar, o cliente já fica escolhido e abre o cadastro do equipamento.
 
