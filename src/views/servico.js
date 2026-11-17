@@ -13,6 +13,7 @@ import { MAX_FOTOS, removerFoto } from '../domain/fotos.js';
 import { definirBusca as buscarEquipamento } from './equipamentos.js';
 import { definirBusca as buscarCliente } from './clientes.js';
 import { vizinhos, filaAtual } from '../domain/vizinhos.js';
+import { FORMAS_PAGAMENTO } from '../domain/cobranca.js';
 
 let pararLog = null;
 let atualizarFotosDeFora = null;
@@ -21,7 +22,6 @@ let atualizarFotosDeFora = null;
 export function update() {
   atualizarFotosDeFora?.();
 }
-const FORMAS_PAGAMENTO = ['PIX', 'Dinheiro', 'Cartão de débito', 'Cartão de crédito', 'Transferência', 'Outra'];
 
 const LABELS = {
   status: 'Status', relatoCliente: 'Relato do cliente', diagnostico: 'Diagnóstico', acoes: 'Ações realizadas',

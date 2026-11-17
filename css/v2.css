@@ -201,3 +201,10 @@ tr.linha-link:hover td, tr.linha-link:focus-visible td{ background:var(--panel-2
 .seta-os{ width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:20px; line-height:1; cursor:pointer; display:grid; place-items:center; padding:0 0 2px; }
 .seta-os:hover:not(:disabled){ border-color:var(--amber); color:var(--amber); }
 .seta-os:disabled{ opacity:.35; cursor:default; }
+
+/* cobrança direto na linha da Conferência */
+.conf-cobranca{ flex-wrap:wrap; }
+.conf-campos{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.conf-campos input{ width:120px; background:var(--panel-2); border:1px solid var(--line); color:var(--text); padding:7px 10px; font-family:var(--font-mono); font-size:13px; }
+.conf-campos input:focus{ outline:none; border-color:var(--amber); }
+.conf-campos .select{ width:150px; padding:7px 10px; font-size:13px; }
