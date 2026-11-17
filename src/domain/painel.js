@@ -1,3 +1,4 @@
+import { rotuloStatus } from './status.js';
 import { totalAReceber } from './finance.js';
 import { precisaAtencao } from './prazo.js';
 import { normalizeSerial, semAcento } from './serial.js';
@@ -32,7 +33,7 @@ export function buscarGlobal({ clientes, equipamentos, servicos }, texto, limite
   for (const s of servicos) {
     const achouSerie = qSerie && serieDe(s.equipamentoId).includes(qSerie);
     if (achouSerie || semAcento(`${s.id} ${nomeEquip(s.equipamentoId)} ${nomeCliente(s.clienteId)}`).includes(q)) {
-      resultados.push({ tipo: 'servico', id: s.id, titulo: `${s.id} · ${nomeEquip(s.equipamentoId)}`, detalhe: `${nomeCliente(s.clienteId)} · ${s.status}`, rota: `servico/${s.id}` });
+      resultados.push({ tipo: 'servico', id: s.id, titulo: `${s.id} · ${nomeEquip(s.equipamentoId)}`, detalhe: `${nomeCliente(s.clienteId)} · ${rotuloStatus(s.status)}`, rota: `servico/${s.id}` });
     }
   }
   for (const e of equipamentos) {

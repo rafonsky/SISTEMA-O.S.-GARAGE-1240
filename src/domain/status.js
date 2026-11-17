@@ -18,6 +18,10 @@ export const STATUS_FECHADOS = [
   'Sem conserto – devolvido ao cliente',
 ];
 
+// O valor guardado no banco continua "Concluído"; só o nome mostrado muda.
+const ROTULOS = { 'Concluído': 'Pronto para retirada' };
+export const rotuloStatus = (status) => ROTULOS[status] ?? status;
+
 export const STATUS_ABERTOS = STATUS_LIST.filter((s) => !STATUS_FECHADOS.includes(s));
 
 // Caminho mostrado no topo da ficha do serviço.

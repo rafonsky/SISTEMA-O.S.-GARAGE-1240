@@ -1,6 +1,7 @@
 import { store, equipById, clienteById } from '../data/store.js';
 import { esc, fmtData, semAcento } from '../ui.js';
 import { GRUPOS, filtrarServicos } from '../domain/grupos.js';
+import { rotuloStatus } from '../domain/status.js';
 import { formatBRL } from '../domain/finance.js';
 
 let grupo = 'todos';
@@ -47,7 +48,7 @@ function desenharTabela() {
         <td data-label="O.S."><b>${esc(s.id)}</b></td>
         <td data-label="Equipamento">${esc(equipById(s.equipamentoId)?.nome ?? '—')}</td>
         <td data-label="Cliente">${esc(clienteById(s.clienteId)?.nome ?? '—')}</td>
-        <td data-label="Status">${esc(s.status)}</td>
+        <td data-label="Status">${esc(rotuloStatus(s.status))}</td>
         <td data-label="Entrada">${esc(fmtData(s.dataEntrada)) || '—'}</td>
         <td data-label="Valor">${s.valorCobrado != null && s.valorCobrado !== '' ? `${esc(formatBRL(s.valorCobrado))}${s.pago ? ' ✔' : ''}` : '—'}</td>
       </tr>`).join('')}</tbody></table>`;

@@ -7,7 +7,7 @@ import { itensPara } from '../domain/checklist.js';
 export const CONTATO = 'Rafael / Eduardo · (41) 9131-2064 · garage1240.oficial@gmail.com';
 
 // O cliente não precisa saber que o aparelho está com um terceiro.
-const STATUS_PARA_CLIENTE = { 'No terceiro': 'Em andamento' };
+const STATUS_PARA_CLIENTE = { 'No terceiro': 'Em andamento', 'Concluído': 'Pronto para retirada' };
 export const statusParaCliente = (status) => STATUS_PARA_CLIENTE[status] ?? status;
 
 const temValor = (v) => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));

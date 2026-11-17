@@ -1,6 +1,6 @@
 import { store, repo, guardarLocal, servicoById, equipById, clienteById, subscribeLogDe } from '../data/store.js';
 import { esc, toast, confirmar, fmtData, hojeStr, openModal, closeModal } from '../ui.js';
-import { STATUS_LIST, ETAPAS } from '../domain/status.js';
+import { STATUS_LIST, ETAPAS, rotuloStatus } from '../domain/status.js';
 import { calcMargem, formatBRL } from '../domain/finance.js';
 import { diasRestantes } from '../domain/prazo.js';
 import { rotuloTipo, specsLinha } from '../domain/equipamento.js';
@@ -90,7 +90,7 @@ export async function render(container, { param, navigate }) {
     <div class="etapas" id="sv-etapas"></div>
     <div class="status-linha">
       <div class="field" style="max-width:320px; margin:0;"><label>Status <span class="hint-inline">(para mudar de etapa)</span></label>
-        <select class="select" id="sv-status" style="width:100%;">${STATUS_LIST.map((x) => `<option ${x === s.status ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
+        <select class="select" id="sv-status" style="width:100%;">${STATUS_LIST.map((x) => `<option value="${esc(x)}" ${x === s.status ? 'selected' : ''}>${esc(rotuloStatus(x))}</option>`).join('')}</select></div>
       <button type="button" class="btn-secondary" id="sv-avancar" style="display:none;"></button>
     </div>
 
@@ -235,8 +235,8 @@ export async function render(container, { param, navigate }) {
       const i = ETAPAS.indexOf(e);
       const ia = ETAPAS.indexOf(atual);
       const cls = e === atual ? 'atual' : ia > i && ia !== -1 ? 'feita' : '';
-      return `<button type="button" class="etapa ${cls}" data-etapa="${esc(e)}">${cls === 'feita' ? '✔ ' : ''}${esc(e)}</button>`;
-    }).join('') + (!ETAPAS.includes(atual) ? `<span class="etapa atual">${esc(atual)}</span>` : '');
+      return `<button type="button" class="etapa ${cls}" data-etapa="${esc(e)}">${cls === 'feita' ? '✔ ' : ''}${esc(rotuloStatus(e))}</button>`;
+    }).join('') + (!ETAPAS.includes(atual) ? `<span class="etapa atual">${esc(rotuloStatus(atual))}</span>` : '');
     $('sv-etapas').querySelectorAll('[data-etapa]').forEach((b) => {
       b.title = 'Abrir a aba desta etapa (não muda o status)';
       b.onclick = () => abrirAba(abaDaEtapa(b.dataset.etapa));
@@ -245,7 +245,7 @@ export async function render(container, { param, navigate }) {
     const proxima = i >= 0 ? ETAPAS[i + 1] : null;
     const btn = $('sv-avancar');
     btn.style.display = proxima ? '' : 'none';
-    btn.textContent = proxima ? `Avançar para: ${proxima}` : '';
+    btn.textContent = proxima ? `Avançar para: ${rotuloStatus(proxima)}` : '';
     btn.onclick = () => { statusEl.value = proxima; marcarSujo(); desenharEtapas(); abrirAba(abaDaEtapa(proxima)); };
     atualizarPendencias();
   };

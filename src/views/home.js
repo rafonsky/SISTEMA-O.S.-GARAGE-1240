@@ -1,4 +1,5 @@
 import { store, equipById, clienteById } from '../data/store.js';
+import { rotuloStatus } from '../domain/status.js';
 import { esc, hojeStr, fmtData } from '../ui.js';
 import { resumoPainel, buscarGlobal } from '../domain/painel.js';
 import { formatBRL } from '../domain/finance.js';
@@ -80,7 +81,7 @@ function blocoFila() {
   const itens = servicos.slice(0, 8).map((s) => `<button class="item-atencao" data-os="${esc(s.id)}">
     <span class="os-id">${esc(s.id)}</span>
     <span class="ia-txt"><b>${esc(equipById(s.equipamentoId)?.nome ?? '—')}</b><small>${esc(clienteById(s.clienteId)?.nome ?? '')}</small></span>
-    <span class="ia-motivo">${esc(s.status)}</span></button>`).join('');
+    <span class="ia-motivo">${esc(rotuloStatus(s.status))}</span></button>`).join('');
   return `<h3 class="sub-titulo">${esc(titulo)} <small class="papel-selo">${esc(ROTULO_PAPEL[papel])}</small></h3>
     ${servicos.length ? `<div class="lista-atencao">${itens}</div>${servicos.length > 8 ? `<div class="hint">e mais ${servicos.length - 8}. Veja todos na tela Serviços.</div>` : ''}` : '<div class="empty" style="padding:22px;">Nada na sua fila agora.</div>'}`;
 }

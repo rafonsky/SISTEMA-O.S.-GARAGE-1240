@@ -4,7 +4,7 @@ import { formatBRL } from '../domain/finance.js';
 import { specsLinha, rotuloTipo } from '../domain/equipamento.js';
 import { findDuplicateEquip } from '../domain/validators.js';
 import { normalizeSerial } from '../domain/serial.js';
-import { TIPOS_EQUIPAMENTO } from '../domain/status.js';
+import { TIPOS_EQUIPAMENTO, rotuloStatus } from '../domain/status.js';
 import { abrirFormCliente } from './clientes.js';
 
 const filtros = { q: '', cliente: '', tipo: '' };
@@ -84,7 +84,7 @@ function abrirHistorico(id, navigate) {
   const m = openModal(`
     <h3>Histórico · ${esc(e.nome)}</h3>
     ${lista.map((s) => `<button class="resultado" data-os="${esc(s.id)}"><span class="res-tipo">${esc(s.id)}</span>
-      <span class="res-txt"><b>${esc(s.status)}</b><small>${esc(fmtData(s.dataEntrada))}${s.valorCobrado ? ` · ${esc(formatBRL(s.valorCobrado))}` : ''} — ${esc((s.relatoCliente ?? '').slice(0, 70))}</small></span></button>`).join('')}
+      <span class="res-txt"><b>${esc(rotuloStatus(s.status))}</b><small>${esc(fmtData(s.dataEntrada))}${s.valorCobrado ? ` · ${esc(formatBRL(s.valorCobrado))}` : ''} — ${esc((s.relatoCliente ?? '').slice(0, 70))}</small></span></button>`).join('')}
     <div class="modal-actions"><button class="btn-secondary" id="hist-fechar">Fechar</button></div>`);
   m.querySelector('#hist-fechar').onclick = closeModal;
   m.querySelectorAll('[data-os]').forEach((b) => (b.onclick = () => { closeModal(); navigate(`servico/${b.dataset.os}`); }));
