@@ -1,6 +1,6 @@
 // Service worker mínimo: deixa o app instalável e abrir sem rede o que já foi carregado.
 // Dados do Firestore NUNCA passam por aqui (são de outro domínio e usam suas próprias conexões).
-const CACHE = 'os-garage-v2.2.2';
+const CACHE = 'os-garage-v2.3.0';
 
 self.addEventListener('install', () => self.skipWaiting());
 
