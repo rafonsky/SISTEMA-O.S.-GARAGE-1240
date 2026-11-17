@@ -1,3 +1,4 @@
+import { STATUS_COM_COBRANCA } from './status.js';
 const temNumero = (v) => v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v));
 
 export function calcMargem({ valorCobrado, terceiro }) {
@@ -7,7 +8,7 @@ export function calcMargem({ valorCobrado, terceiro }) {
 
 export function totalAReceber(servicos) {
   return servicos
-    .filter((s) => ['Concluído', 'Entregue ao cliente'].includes(s.status) && s.pago !== true && temNumero(s.valorCobrado))
+    .filter((s) => STATUS_COM_COBRANCA.includes(s.status) && s.pago !== true && temNumero(s.valorCobrado))
     .reduce((soma, s) => soma + Number(s.valorCobrado), 0);
 }
 

@@ -8,7 +8,7 @@ import { diasRestantes, precisaAtencao } from '../src/domain/prazo.js';
 import { diffCampos, buildLogEntry } from '../src/domain/audit.js';
 
 test('status: lista completa e etapas válidas', () => {
-  assert.equal(STATUS_LIST.length, 10);
+  assert.equal(STATUS_LIST.length, 11);
   assert.ok(STATUS_LIST.includes('No terceiro'));
   assert.ok(ETAPAS.every((e) => STATUS_LIST.includes(e)));
   assert.ok(!STATUS_ABERTOS.includes('Concluído'));

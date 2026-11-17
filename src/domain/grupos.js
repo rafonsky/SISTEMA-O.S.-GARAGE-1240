@@ -1,6 +1,7 @@
 // Grupos de serviços usados pelos cartões do painel e pelos filtros da tela Serviços.
 // Os mesmos grupos alimentam as contagens do painel, para o número do cartão bater com a lista.
 import { semAcento } from './serial.js';
+import { STATUS_COM_COBRANCA, STATUS_FECHADOS } from './status.js';
 
 const temNumero = (v) => v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v));
 
@@ -11,11 +12,11 @@ export const GRUPOS = {
   'aguardando-aprovacao': { rotulo: 'Aguardando aprovação', filtro: (s) => s.status === 'Aguardando aprovação' },
   'a-receber': {
     rotulo: 'A receber',
-    filtro: (s) => ['Concluído', 'Entregue ao cliente'].includes(s.status) && s.pago !== true && temNumero(s.valorCobrado),
+    filtro: (s) => STATUS_COM_COBRANCA.includes(s.status) && s.pago !== true && temNumero(s.valorCobrado),
   },
   encerrados: {
     rotulo: 'Encerrados',
-    filtro: (s) => ['Concluído', 'Entregue ao cliente', 'Sem conserto – peças aproveitadas', 'Sem conserto – devolvido ao cliente'].includes(s.status),
+    filtro: (s) => STATUS_FECHADOS.includes(s.status),
   },
 };
 

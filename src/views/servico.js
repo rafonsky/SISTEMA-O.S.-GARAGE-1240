@@ -1,6 +1,6 @@
 import { store, repo, guardarLocal, servicoById, equipById, clienteById, subscribeLogDe } from '../data/store.js';
 import { esc, toast, confirmar, fmtData, hojeStr, openModal, closeModal } from '../ui.js';
-import { STATUS_LIST, ETAPAS, rotuloStatus } from '../domain/status.js';
+import { STATUS_LIST, ETAPAS, rotuloStatus, dataDeConclusao } from '../domain/status.js';
 import { calcMargem, formatBRL } from '../domain/finance.js';
 import { diasRestantes } from '../domain/prazo.js';
 import { rotuloTipo, specsLinha } from '../domain/equipamento.js';
@@ -530,7 +530,7 @@ export async function render(container, { param, navigate }) {
     $('sv-erro').textContent = '';
     const status = statusEl.value;
     let conclusao = $('sv-conclusao').value;
-    if (['Concluído', 'Entregue ao cliente'].includes(status) && !conclusao) conclusao = hojeStr();
+    conclusao = dataDeConclusao(status, conclusao, hojeStr());
     // Passar adiante com a conferência de entrada incompleta é permitido, mas pede confirmação.
     const tipo = tipoAtual();
     if (existente?.status === 'Recebido' && status !== 'Recebido' && tipo) {
