@@ -2,6 +2,10 @@
 
 Formato `v2.X.Y`: correção pequena sobe o último número; função nova sobe o do meio; mudança grande no jeito de guardar os dados sobe o primeiro.
 
+## v2.2.2 — em preparação
+
+- O app passa a conferir com o servidor se cada arquivo mudou, em vez de usar a cópia do navegador por até 10 minutos. Versão nova aparece logo após publicar.
+
 ## v2.2.1 — 17/11/2026
 
 - Conferência: Abrir num equipamento repetido (ou sem cliente) já mostra só os equipamentos apontados em Equipamentos, com o botão Ver todos.
