@@ -11,7 +11,7 @@ import { currentUsuario } from '../auth.js';
 import { enviarFoto, apagarArquivo } from '../data/fotos.js';
 import { MAX_FOTOS, removerFoto } from '../domain/fotos.js';
 import { definirBusca as buscarEquipamento } from './equipamentos.js';
-import { definirBusca as buscarCliente } from './clientes.js';
+import { definirBusca as buscarCliente, abrirFormCliente } from './clientes.js';
 import { vizinhos, filaAtual } from '../domain/vizinhos.js';
 import { FORMAS_PAGAMENTO } from '../domain/cobranca.js';
 
@@ -103,7 +103,8 @@ export async function render(container, { param, navigate }) {
       <div class="bloco">
         <div class="grade-2">
           <div class="field"><label>Cliente</label>
-            <select id="sv-cliente" ${F}><option value="">— escolha —</option>${clientes.map((c) => `<option value="${esc(c.id)}" ${c.id === s.clienteId ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></div>
+            <select id="sv-cliente" ${F}><option value="">— escolha —</option>${clientes.map((c) => `<option value="${esc(c.id)}" ${c.id === s.clienteId ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select>
+            <button type="button" class="link-btn" id="sv-novo-cli" style="margin-top:6px;">+ Cadastrar novo cliente</button></div>
           <div class="field"><label>Equipamento</label>
             <select id="sv-equip" ${F}></select>
             <button type="button" class="link-btn" id="sv-novo-equip" style="margin-top:6px;">+ Cadastrar novo equipamento</button></div>
@@ -489,6 +490,18 @@ export async function render(container, { param, navigate }) {
   };
   $('sv-cliente').onchange = () => { equipId = ''; desenharEquip(); };
   $('sv-equip').onchange = () => { equipId = $('sv-equip').value; infoEquip(); };
+  $('sv-novo-cli').onclick = () => {
+    abrirFormCliente(null, (novoCli) => {
+      const opcao = document.createElement('option');
+      opcao.value = novoCli.id;
+      opcao.textContent = novoCli.nome;
+      $('sv-cliente').appendChild(opcao);
+      $('sv-cliente').value = novoCli.id;
+      $('sv-cliente').dispatchEvent(new Event('change', { bubbles: true }));
+      // Cliente novo ainda não tem equipamento: já abre o cadastro do equipamento.
+      abrirFormEquipamento(null, novoCli.id, (novoEq) => { equipId = novoEq.id; desenharEquip(); });
+    });
+  };
   $('sv-novo-equip').onclick = () => {
     if (!$('sv-cliente').value) { toast('Escolha o cliente primeiro.'); return; }
     abrirFormEquipamento(null, $('sv-cliente').value, (novoEq) => { equipId = novoEq.id; desenharEquip(); });

@@ -2,6 +2,10 @@
 
 Formato `v2.X.Y`: correção pequena sobe o último número; função nova sobe o do meio; mudança grande no jeito de guardar os dados sobe o primeiro.
 
+## v2.3.1 — em preparação
+
+- Novo serviço: botão + Cadastrar novo cliente ao lado do cliente. Ao salvar, o cliente já fica escolhido e abre o cadastro do equipamento.
+
 ## v2.3.0 — 17/11/2026
 
 - Novo status Recusado pelo cliente, para orçamento não aprovado: encerra a O.S., preenche a data de conclusão, sai da fila de aprovação e só entra em A receber se houver valor lançado.
